@@ -26,12 +26,12 @@ jobs:
         name: chrome-extension.zip
         path: build/extension.zip
 
-    # - name: Upload to Chrome Web Store
-    #   uses: mobilefirstllc/cws-publish@latest
-    #   with:
-    #     action: 'publish'  # one of: upload, publish, testers
-    #     client_id: ${{ secrets.CLIENT }}
-    #     client_secret: ${{ secrets.SECRET }}
-    #     refresh_token: ${{ secrets.TOKEN }}
-    #     extension_id: '32-CHAR EXTENSION ID' 
-    #     zip_file: 'build/extension.zip'
+    - name: Upload to Chrome Web Store
+      uses: mobilefirstllc/cws-publish@latest
+      with:
+        action: 'publish'  # one of: upload, publish, testers
+        client_id: ${{ secrets.CLIENT }}
+        client_secret: ${{ secrets.SECRET }}
+        refresh_token: ${{ secrets.TOKEN }}
+        extension_id: 'cdodhippkioagjgbchpljiboecdljklm' 
+        zip_file: 'build/extension.zip'
