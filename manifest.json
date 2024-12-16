@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub Pull Request Mark All Files as",
+  "version": "1.0",
+  "permissions": ["scripting", "activeTab"],
+  "host_permissions": ["https://github.com/**"],
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/**/pull/**/files"],
+      "js": ["content.js"]
+    }
+  ],
+  "homepage_url": "https://github.com/Dunky13/outlook_unsafelink",
+  "icons": {
+    "16": "images/icon.16.png",
+    "32": "images/icon.32.png",
+    "48": "images/icon.48.png",
+    "64": "images/icon.64.png",
+    "128":"images/icon.128.png",
+    "300":"images/icon.300.png"
+  },
+  "action": {
+    "default_title": "GitHub Pull Request Mark All Files as"
+  }
+}

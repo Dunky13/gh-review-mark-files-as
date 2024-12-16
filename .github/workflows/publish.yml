@@ -1,0 +1,31 @@
+name: Publish Chrome Extension
+
+on:
+  push:
+    branches:
+      - main  # Change to your default branch name if different
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Checkout the repository code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Step 3: Pack the Chrome Extension into a ZIP file
+    - name: Pack Chrome Extension
+      run: |
+        mkdir -p build
+        zip -r build/extension.zip * -x "*.git*" "node_modules/*" ".github/*"
+
+    - name: Upload to Chrome Web Store
+      uses: mobilefirstllc/cws-publish@latest
+      with:
+        action: 'publish'  # one of: upload, publish, testers
+        client_id: ${{ secrets.CLIENT }}
+        client_secret: ${{ secrets.SECRET }}
+        refresh_token: ${{ secrets.TOKEN }}
+        extension_id: '32-CHAR EXTENSION ID' 
+        zip_file: 'build/extension.zip'
