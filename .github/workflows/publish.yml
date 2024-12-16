@@ -20,18 +20,19 @@ jobs:
         mkdir -p build
         zip -r build/extension.zip * -x "*.git*" "node_modules/*" ".github/*"
 
-    - name: Upload Extension Artifact
-      uses: actions/upload-artifact@v3
+                - name: Upload a Build Artifact
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v4
       with:
-        name: chrome-extension
+        name: chrome-extension.zip
         path: build/extension.zip
 
-    - name: Upload to Chrome Web Store
-      uses: mobilefirstllc/cws-publish@latest
-      with:
-        action: 'publish'  # one of: upload, publish, testers
-        client_id: ${{ secrets.CLIENT }}
-        client_secret: ${{ secrets.SECRET }}
-        refresh_token: ${{ secrets.TOKEN }}
-        extension_id: '32-CHAR EXTENSION ID' 
-        zip_file: 'build/extension.zip'
+    # - name: Upload to Chrome Web Store
+    #   uses: mobilefirstllc/cws-publish@latest
+    #   with:
+    #     action: 'publish'  # one of: upload, publish, testers
+    #     client_id: ${{ secrets.CLIENT }}
+    #     client_secret: ${{ secrets.SECRET }}
+    #     refresh_token: ${{ secrets.TOKEN }}
+    #     extension_id: '32-CHAR EXTENSION ID' 
+    #     zip_file: 'build/extension.zip'
