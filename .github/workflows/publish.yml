@@ -20,6 +20,12 @@ jobs:
         mkdir -p build
         zip -r build/extension.zip * -x "*.git*" "node_modules/*" ".github/*"
 
+    - name: Upload Extension Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: chrome-extension
+        path: build/extension.zip
+
     - name: Upload to Chrome Web Store
       uses: mobilefirstllc/cws-publish@latest
       with:
