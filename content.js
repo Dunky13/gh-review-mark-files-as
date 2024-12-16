@@ -14,10 +14,7 @@ const setInitialFiles = () => {
 
 const initialize = () => {
   // Ensure this runs only on pull request pages
-  if (!window.location.pathname.includes("/pull/")) return;
-
-  // Ensure this only runs on pages ending with "/files"
-  if (!window.location.pathname.endsWith("/files")) return;
+  if (!(window.location.pathname.includes("/pull/") && window.location.pathname.includes("/files"))) return;
 
   // Check if files section exists
   const filesSection = document.querySelector(".js-diff-progressive-container");
