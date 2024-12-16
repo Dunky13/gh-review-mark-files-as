@@ -1,73 +1,124 @@
-const myInitCode = () => {
+let files = [];
+let initialFileStates = {}; // Global variable to store the initial state of all files
+const checkboxState = ['n', 'm', 'y'];
+let position = 0;
+
+const setInitialFiles = () => {
+  // Store the initial state of each file
+  files = document.querySelectorAll("input.js-reviewed-checkbox");
+  const fileStates = Array.from(files).reduce((acc, checkbox) => {
+    acc[checkbox.id] ??= checkbox.checked;
+    return acc;
+  }, initialFileStates);
+}
+
+const initialize = () => {
   // Ensure this runs only on pull request pages
   if (!window.location.pathname.includes("/pull/")) return;
 
+  // Ensure this only runs on pages ending with "/files"
+  if (!window.location.pathname.endsWith("/files")) return;
+
   // Check if files section exists
-  const filesSection = window.location.pathname.endsWith('files') //document.querySelector(".js-diff-progressive-container");
+  const filesSection = document.querySelector(".js-diff-progressive-container");
   if (!filesSection) return;
 
-  // Add the custom "Mark All" buttons
-  addMarkAllButtons();
+  setInitialFiles();
+
+  const checkboxList = Object.values(initialFileStates);
+  const checkedLength = checkboxList.filter(Boolean).length;
+  position = checkedLength === 0 ? 0 : checkedLength === checkboxList.length ? 2 : 1;
+  // Add the custom checkbox
+  addStateCheckbox();
 };
 
-function addMarkAllButtons() {
-  // Check if buttons already exist
-  if (document.querySelector("#mark-all-files-viewed")) return;
 
-  // Create a container for the buttons
-  // const container = document.createElement("div");
-  // container.style.margin = "10px 0";
 
-  // Create "Mark All as Viewed" button
-  const markAllBtn = document.createElement("button");
-  markAllBtn.id = "mark-all-files-viewed";
-  markAllBtn.textContent = "Mark All as Viewed";
-  // markAllBtn.style.marginRight = "10px";
-  markAllBtn.className = "diffbar-item btn btn-primary"; // GitHub-style button
-  markAllBtn.addEventListener("click", markAllAsViewed);
+const togglePosition = () => {
+  position = (position + 1) % checkboxState.length;
+  return checkboxState[position];
+}
 
-  // Create "Unmark All as Viewed" button
-  const unmarkAllBtn = document.createElement("button");
-  unmarkAllBtn.id = "unmark-all-files-viewed";
-  unmarkAllBtn.textContent = "Unmark All as Viewed";
-  unmarkAllBtn.className = "diffbar-item btn btn-secondary";
-  unmarkAllBtn.addEventListener("click", unmarkAllAsViewed);
-
-  // Append buttons to the container
-  // container.appendChild(markAllBtn);
-  // container.appendChild(unmarkAllBtn);
-
-  // Insert the container at the top of the files list
-  const filesHeader = document.querySelector(".diffbar");
-  if (filesHeader) {
-    filesHeader.appendChild(markAllBtn);
-    filesHeader.appendChild(unmarkAllBtn);
-    // filesHeader.parentNode.insertBefore(container, filesHeader.nextSibling);
+const setCheckboxState = (stateCheckbox, newState) => {
+  switch (newState) {
+    case 'y':
+      stateCheckbox.checked = true;
+      stateCheckbox.indeterminate = false;
+      break;
+    case 'n':
+      stateCheckbox.checked = false;
+      stateCheckbox.indeterminate = false;
+      break;
+    case 'm':
+      stateCheckbox.checked = false;
+      stateCheckbox.indeterminate = true;
+      break;
+    default:
+      stateCheckbox.checked = false;
+      stateCheckbox.indeterminate = true;
+      break;
   }
 }
 
-function markAllAsViewed() {
-  const viewedCheckboxes = document.querySelectorAll(
-    'input.js-reviewed-checkbox:not(:checked)'
-  );
-  viewedCheckboxes.forEach((checkbox) => checkbox.click());
-}
+function addStateCheckbox() {
+  // Check if the checkbox already exists
+  if (document.querySelector("#viewed-state-checkbox")) return;
 
-function unmarkAllAsViewed() {
-  const viewedCheckboxes = document.querySelectorAll(
-    'input.js-reviewed-checkbox:checked'
-  );
-  viewedCheckboxes.forEach((checkbox) => checkbox.click());
-}
+  // Create the checkbox
+  const stateCheckbox = document.createElement("input");
+  stateCheckbox.id = "viewed-state-checkbox";
+  stateCheckbox.type = "checkbox";
+  stateCheckbox.style.marginRight = "10px";
+  stateCheckbox.title = "Toggle all files viewed state";
 
+  // Label for the checkbox
+  const label = document.createElement("label");
+  label.textContent = "Mark All Files";
+  label.style.fontWeight = "bold";
+  label.style.marginRight = "10px";
+  label.className = "diffbar-item Button--primary Button--small Button"; // GitHub-style button
+  label.appendChild(stateCheckbox);
 
-if (document.readyState !== 'loading') {
-  console.log('document is already ready, just execute code here');
-  myInitCode();
-} else {
-  console.log('dom loading event listener');
-  document.addEventListener('DOMContentLoaded', function () {
-    console.log('document was not ready, place code here');
-    myInitCode();
+  // Append the checkbox to the GitHub pull request tools header
+  const filesHeader = document.querySelector(".pr-review-tools");
+  if (filesHeader) {
+    filesHeader.prepend(label);
+  }
+
+  setCheckboxState(stateCheckbox, checkboxState[position]);
+
+  // Add event listener to toggle file states
+  stateCheckbox.addEventListener("click", () => {
+    const newState = togglePosition();
+    setCheckboxState(stateCheckbox, newState);
+    setInitialFiles();
+    toggleFileStates(stateCheckbox);
   });
+}
+
+function toggleFileStates(stateCheckbox) {
+  if (stateCheckbox.indeterminate) {
+    // Revert to the initial state if checkbox is indeterminate
+    files.forEach((checkbox) => {
+      if (checkbox.checked !== initialFileStates[checkbox.id]) {
+        checkbox.click();
+      }
+    });
+  } else {
+    // Toggle to the target state based on checkbox
+    const targetState = stateCheckbox.checked; // true for "mark all as viewed", false for "unmark all"
+    files.forEach((checkbox) => {
+      if (checkbox.checked !== targetState) {
+        checkbox.click();
+      }
+    });
+  }
+}
+
+// Initialize when the DOM is ready
+if (document.readyState !== "loading") {
+  console.log("Document was ready");
+  initialize();
+} else {
+  document.addEventListener("DOMContentLoaded", initialize);
 }

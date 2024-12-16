@@ -18,7 +18,7 @@ jobs:
     - name: Pack Chrome Extension
       run: |
         mkdir -p build
-        zip -r build/extension.zip * -x "*.git*" "node_modules/*" ".github/*"
+        zip -r build/extension.zip * -x "*.git*" "node_modules/*" ".github/*" "build/*"
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
