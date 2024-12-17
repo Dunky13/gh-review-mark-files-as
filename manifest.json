@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "GitHub Pull Request Mark All Files as",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "permissions": ["scripting", "activeTab"],
   "host_permissions": ["https://github.com/**"],
   "content_scripts": [
     {
-      "matches": ["https://github.com/**/pull/**/files", "https://github.com/**/pull/**/files/**"],
+      "matches": ["https://github.com/**/pull/**"],
       "js": ["content.js"]
     }
   ],

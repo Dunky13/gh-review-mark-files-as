@@ -1,4 +1,6 @@
+/** @type {NodeListOf<Element>} */
 let files = [];
+
 let initialFileStates = {}; // Global variable to store the initial state of all files
 const checkboxState = ['n', 'm', 'y'];
 let position = 0;
@@ -6,25 +8,34 @@ let position = 0;
 const setInitialFiles = () => {
   // Store the initial state of each file
   files = document.querySelectorAll("input.js-reviewed-checkbox");
-  const fileStates = Array.from(files).reduce((acc, checkbox) => {
-    acc[checkbox.id] ??= checkbox.checked;
-    return acc;
-  }, initialFileStates);
+  Array.from(files).forEach((checkbox) => {
+    initialFileStates[checkbox.id] ??= checkbox.checked;
+  });
+}
+
+const updatePosition = (numberOfChecked) => {
+  position = numberOfChecked === 0 ? 0 : numberOfChecked === files.length ? 2 : 1
+}
+
+const calculateState = () => {
+  const checked = Array.from(files).reduce((acc, checkbox) => acc + (+checkbox.checked), 0);
+  console.log({ checked, files: Array.from(files).map(file => file.checked) });
+  updatePosition(checked);
 }
 
 const initialize = () => {
   // Ensure this runs only on pull request pages
-  if (!(window.location.pathname.includes("/pull/") && window.location.pathname.includes("/files"))) return;
+  if (!(window.location.pathname.match(/.+\/pull\/.+\/files.*/))) return;
 
   // Check if files section exists
   const filesSection = document.querySelector(".js-diff-progressive-container");
   if (!filesSection) return;
+  if (document.querySelector("#viewed-state-checkbox")) return;
 
   setInitialFiles();
 
-  const checkboxList = Object.values(initialFileStates);
-  const checkedLength = checkboxList.filter(Boolean).length;
-  position = checkedLength === 0 ? 0 : checkedLength === checkboxList.length ? 2 : 1;
+  const checkedLength = Object.values(initialFileStates).filter(Boolean).length;
+  updatePosition(checkedLength)
   // Add the custom checkbox
   addStateCheckbox();
 };
@@ -91,12 +102,29 @@ function addStateCheckbox() {
     setInitialFiles();
     toggleFileStates(stateCheckbox);
   });
+
+  // select the target node
+  const target = document.getElementsByClassName('js-review-count')[0];
+
+  // create an observer instance
+  const observer = new MutationObserver(function (mutations) {
+    mutations.forEach(function (mutation) {
+      setInitialFiles();
+      calculateState();
+      setCheckboxState(stateCheckbox, checkboxState[position]);
+    });
+  });
+
+  // pass in the target node, as well as the observer options
+  observer.observe(target, { attributes: true, childList: true, characterData: true });
+
+
 }
 
 function toggleFileStates(stateCheckbox) {
   if (stateCheckbox.indeterminate) {
     // Revert to the initial state if checkbox is indeterminate
-    files.forEach((checkbox) => {
+    Array.from(files).forEach((checkbox) => {
       if (checkbox.checked !== initialFileStates[checkbox.id]) {
         checkbox.click();
       }
@@ -104,7 +132,7 @@ function toggleFileStates(stateCheckbox) {
   } else {
     // Toggle to the target state based on checkbox
     const targetState = stateCheckbox.checked; // true for "mark all as viewed", false for "unmark all"
-    files.forEach((checkbox) => {
+    Array.from(files).forEach((checkbox) => {
       if (checkbox.checked !== targetState) {
         checkbox.click();
       }
@@ -112,10 +140,20 @@ function toggleFileStates(stateCheckbox) {
   }
 }
 
-// Initialize when the DOM is ready
-if (document.readyState !== "loading") {
-  console.log("Document was ready");
-  initialize();
-} else {
-  document.addEventListener("DOMContentLoaded", initialize);
+let lastUrl = '';
+/**
+ * GitHub seems to be loading in-place, 
+ * so we need to constantly look for url updates to make sure the extension is loaded correctly
+ */
+function timeoutCB() {
+  setTimeout(() => {
+    const currUrl = window.location.pathname;
+    if (currUrl !== lastUrl) {
+      lastUrl = currUrl;
+      initialize()
+    }
+    timeoutCB()
+  }, 1000);
 }
+console.debug('`GitHub Pull Request Mark All Files as` extension has been loaded')
+timeoutCB();
