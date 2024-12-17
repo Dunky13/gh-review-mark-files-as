@@ -1,4 +1,4 @@
-# GitHub Pull Request Mark All Files as ~~[Install here]()~~
+# GitHub Pull Request Mark All Files as [Install here](https://chromewebstore.google.com/detail/cdodhippkioagjgbchpljiboecdljklm/)
 
 Extension that adds 2 buttons to mark all files as viewed, or unchecks it. 
 Especially useful on large PRs with many files, and you want to quickly (un)check all files.
