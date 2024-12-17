@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GitHub Pull Request Mark All Files as",
-  "version": "1.0",
+  "version": "1.0.1",
   "permissions": ["scripting", "activeTab"],
   "host_permissions": ["https://github.com/**"],
   "content_scripts": [
