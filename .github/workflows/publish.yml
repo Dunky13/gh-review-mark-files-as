@@ -6,19 +6,23 @@ on:
       - main  # Change to your default branch name if different
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   build-and-publish:
+    needs: test
     runs-on: ubuntu-24.04
 
     steps:
     # Step 1: Checkout the repository code
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Step 3: Pack the Chrome Extension into a ZIP file
     - name: Pack Chrome Extension
       run: |
         mkdir -p build
-        zip -r build/extension.zip * -x "*.git*" "node_modules/*" ".github/*" "build/*"
+        zip -r build/extension.zip manifest.json content.js images LICENSE
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
