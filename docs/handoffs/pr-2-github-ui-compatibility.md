@@ -1,4 +1,6 @@
-# GitHub Files changed compatibility handoff
+# PR #2: GitHub Files changed compatibility handoff
+
+Pull request: https://github.com/Dunky13/gh-review-mark-files-as/pull/2
 
 The extension stopped appearing on GitHub's redesigned `/changes` page because initialization accepted only `/files` and required classic diff and toolbar markup. GitHub's Viewed controls also changed from native checkboxes to React buttons. URL-only initialization missed delayed page rendering.
 
