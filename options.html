@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File review settings</title>
+  <link rel="stylesheet" href="options.css">
+  <script src="settings.js" defer></script>
+  <script src="options.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Review buttons</h1>
+    <form>
+      <fieldset disabled>
+        <div id="buttons"></div>
+        <div class="actions">
+          <button type="button" id="add">+ Add button</button>
+          <div class="save-actions"><button type="button" id="reset" title="Restore one All Files button">Reset</button><button type="submit">Save</button></div>
+        </div>
+      </fieldset>
+    </form>
+    <div class="footer">
+      <span>Loaded files · all repositories</span>
+      <details>
+        <summary>Pattern help</summary>
+        <p>Paths start at the repository root. <code>*</code> matches a name, <code>**</code> crosses folders, <code>?</code> matches one character. Case-sensitive.</p>
+        <p>Blank Include matches all files. Exclude always wins. Use +/− to add or remove patterns. Save applies changes to open pull requests.</p>
+        <p>Up to 20 buttons. Reset restores one All Files button.</p>
+      </details>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>
