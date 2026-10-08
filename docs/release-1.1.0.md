@@ -1,4 +1,6 @@
-# Release 1.1.0 handoff
+# PR #3 - Release 1.1.0 handoff
+
+Pull request: https://github.com/Dunky13/gh-review-mark-files-as/pull/3
 
 The approved change adds multiple named review buttons, each with include/exclude file patterns, and a compact Options page. Patterns use individual fields with +/− controls. Each button changes only matching loaded files and preserves the existing viewed/unviewed/original-mixed-selection cycle. Default settings retain All Files.
 
