@@ -7,9 +7,53 @@
   ].join(',');
   const initialFileStates = new Map();
   let page = '';
-  let position = 0;
   let busy = false;
   let scheduled = false;
+  let buttons = reviewFileSettings.defaults.buttons.map(button => ({ ...button, filter: reviewFileSettings.compile(button) }));
+  let settingsReady = false;
+  let settingsError = '';
+  let settingsRevision = 0;
+
+  function applySettings(value) {
+    try {
+      buttons = reviewFileSettings.normalize(value).buttons.map(button => ({ ...button, filter: reviewFileSettings.compile(button) }));
+      settingsError = '';
+    } catch (error) {
+      settingsError = error.message;
+    }
+    settingsReady = true;
+    scheduleSynchronize();
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.filePatterns) return;
+    settingsRevision++;
+    applySettings(changes.filePatterns.newValue);
+  });
+  const loadRevision = settingsRevision;
+  void (async () => {
+    try {
+      const stored = await chrome.storage.local.get('filePatterns');
+      if (settingsRevision === loadRevision) applySettings(stored.filePatterns);
+    } catch (error) {
+      if (settingsRevision !== loadRevision) return;
+      settingsError = `Could not load file patterns: ${error.message}. Reload the extension and try again.`;
+      settingsReady = true;
+      scheduleSynchronize();
+    }
+  })();
+
+  function filePath(file) {
+    const diff = file.closest('[data-path], [data-file-path], [role="region"][id], [class*="Diff-module"][id]');
+    return diff?.getAttribute('data-path') || diff?.getAttribute('data-file-path')
+      || diff?.querySelector('a[href^="#diff-"][title]')?.getAttribute('title')
+      || diff?.getAttribute('aria-label') || '';
+  }
+
+  function getTargetFiles(button) {
+    const filter = button.filter;
+    return getFiles().filter(file => !filter.active || (filePath(file) && filter.matches(filePath(file))));
+  }
 
   function getFiles() {
     return Array.from(document.querySelectorAll(viewedSelector));
@@ -33,22 +77,27 @@
       || document.querySelector('[class*="ViewedFileProgress"]')?.parentElement;
   }
 
-  function updateControl(control, files) {
+  function updateControl(control, files, button) {
+    const filter = button.filter;
     const checked = files.filter(isViewed).length;
-    position = checked === 0 ? 0 : checked === files.length ? 2 : 1;
+    const position = checked === 0 ? 0 : checked === files.length ? 2 : 1;
     control.checked = position === 2;
     control.indeterminate = position === 1;
-    const disabled = busy || files.length === 0;
+    const disabled = busy || !settingsReady || Boolean(settingsError) || files.length === 0;
     if (control.disabled !== disabled) control.disabled = disabled;
     const progress = document.querySelector('[class*="ViewedFileProgress"], .js-review-count');
     const total = Number(progress?.textContent.match(/\d+\s*\/\s*(\d+)/)?.[1]);
-    const partial = total > files.length;
-    const text = partial ? 'Mark Loaded Files' : 'Mark All Files';
-    const labelText = document.querySelector('#viewed-state-label');
+    const partial = total > getFiles().length;
+    const text = button.name === 'All Files' && !filter.active
+      ? partial ? 'Mark Loaded Files' : 'Mark All Files'
+      : `Mark ${button.name} (${files.length})`;
+    const labelText = control.nextElementSibling;
     if (labelText && labelText.textContent !== text) labelText.textContent = text;
-    const title = partial
+    const title = settingsError || (!settingsReady ? 'Loading file patterns…' : filter.active
+      ? 'Cycle matching loaded files between viewed, unviewed, and their original selection. Other files stay untouched.'
+      : partial
       ? 'Only loaded files can be changed. Load the remaining files to include them.'
-      : 'Cycle between all viewed, none viewed, and the original selection';
+      : 'Cycle between all viewed, none viewed, and the original selection');
     if (control.title !== title) control.title = title;
   }
 
@@ -59,8 +108,9 @@
     if (path !== page) {
       page = path;
       initialFileStates.clear();
-      document.querySelector('#viewed-state-control')?.remove();
+      document.querySelector('#viewed-state-controls')?.remove();
       document.querySelector('#viewed-state-error')?.remove();
+      document.querySelector('#viewed-state-settings')?.remove();
     }
     if (!isFilesPage) return;
     const files = getFiles();
@@ -68,27 +118,67 @@
       const key = fileKey(file);
       if (!initialFileStates.has(key)) initialFileStates.set(key, isViewed(file));
     }
+    if (!settingsReady) return;
     const header = getHeader();
     if (!header) return;
-    let control = document.querySelector('#viewed-state-checkbox');
-    if (!control) {
-      const label = document.createElement('label');
-      label.id = 'viewed-state-control';
-      label.className = 'diffbar-item Button--primary Button--small Button';
-      label.style.cssText = 'display:inline-flex;align-items:center;gap:6px;margin-right:10px;flex-shrink:0;cursor:pointer';
-      control = document.createElement('input');
-      control.id = 'viewed-state-checkbox';
-      control.type = 'checkbox';
-      const text = document.createElement('span');
-      text.id = 'viewed-state-label';
-      text.textContent = 'Mark All Files';
-      label.append(control, text);
-      header.prepend(label);
-      control.addEventListener('click', toggleFiles);
-    } else if (control.parentElement.parentElement !== header) {
-      header.prepend(control.parentElement);
+    let controls = document.querySelector('#viewed-state-controls');
+    if (!controls) {
+      controls = document.createElement('div');
+      controls.id = 'viewed-state-controls';
+      controls.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap';
+      header.prepend(controls);
+    } else if (controls.parentElement !== header) header.prepend(controls);
+    for (const label of Array.from(controls.children)) {
+      if (!buttons.some(button => button.id === label.dataset.buttonId)) label.remove();
     }
-    if (!busy) updateControl(control, files);
+    buttons.forEach((button, index) => {
+      let label = Array.from(controls.children).find(child => child.dataset.buttonId === button.id);
+      if (!label) {
+        label = document.createElement('label');
+        label.dataset.buttonId = button.id;
+        label.className = 'diffbar-item Button--primary Button--small Button';
+        label.style.cssText = 'display:inline-flex;align-items:center;gap:6px;flex-shrink:0;cursor:pointer';
+        const control = document.createElement('input');
+        control.type = 'checkbox';
+        const text = document.createElement('span');
+        label.append(control, text);
+        control.addEventListener('click', event => {
+          const current = buttons.find(candidate => candidate.id === label.dataset.buttonId);
+          if (current) void toggleFiles(event, current);
+        });
+        controls.append(label);
+      }
+      const control = label.querySelector('input');
+      control.id = index === 0 ? 'viewed-state-checkbox' : `viewed-state-checkbox-${button.id}`;
+      label.querySelector('span').id = index === 0 ? 'viewed-state-label' : `viewed-state-label-${button.id}`;
+      if (controls.children[index] !== label) controls.insertBefore(label, controls.children[index] || null);
+      updateControl(control, getTargetFiles(button), button);
+    });
+    let settingsLink = document.querySelector('#viewed-state-settings');
+    if (!settingsLink) {
+      settingsLink = document.createElement('button');
+      settingsLink.id = 'viewed-state-settings';
+      settingsLink.textContent = 'Settings';
+      settingsLink.type = 'button';
+      settingsLink.className = 'Button Button--small';
+      settingsLink.addEventListener('click', async () => {
+        try {
+          const result = await chrome.runtime.sendMessage({ type: 'open-file-review-settings' });
+          if (!result?.opened) throw new Error(result?.error || 'The extension did not respond.');
+        } catch (error) {
+          let status = document.querySelector('#viewed-state-error');
+          if (!status) {
+            status = document.createElement('span');
+            status.id = 'viewed-state-error';
+            status.setAttribute('role', 'alert');
+            settingsLink.after(status);
+          }
+          status.textContent = `Could not open Settings: ${error.message}. Try the extension’s Options menu.`;
+        }
+      });
+      settingsLink.style.cssText = 'margin-right:10px;flex-shrink:0';
+    }
+    if (controls.nextSibling !== settingsLink) controls.after(settingsLink);
   }
 
   function scheduleSynchronize() {
@@ -140,15 +230,18 @@
     });
   }
 
-  async function toggleFiles(event) {
+  async function toggleFiles(event, button) {
     const control = event.currentTarget;
-    if (busy) return;
-    const files = getFiles();
+    if (busy || !settingsReady || settingsError) return;
+    const files = getTargetFiles(button);
+    if (!files.length) return;
     // Capture newly loaded files before choosing the restore state.
     for (const file of files) {
       const key = fileKey(file);
       if (!initialFileStates.has(key)) initialFileStates.set(key, isViewed(file));
     }
+    const checked = files.filter(isViewed).length;
+    const position = checked === 0 ? 0 : checked === files.length ? 2 : 1;
     let next = (position + 1) % 3;
     const originalStates = files.map(file => initialFileStates.get(fileKey(file)));
     if (next === 1 && (!originalStates.some(Boolean) || originalStates.every(Boolean))) next = 2;
@@ -159,7 +252,7 @@
       state: next === 1 ? initialFileStates.get(fileKey(file)) : next === 2,
     }));
     busy = true;
-    control.disabled = true;
+    synchronize();
     try {
       for (const target of targets) await setViewed(target.key, target.state, batchPage);
     } catch (error) {
@@ -170,7 +263,7 @@
           status = document.createElement('span');
           status.id = 'viewed-state-error';
           status.setAttribute('role', 'alert');
-          control.parentElement.after(status);
+          document.querySelector('#viewed-state-controls').after(status);
         }
         status.textContent = error.message;
       }

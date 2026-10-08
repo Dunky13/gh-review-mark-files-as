@@ -1,12 +1,16 @@
 {
   "manifest_version": 3,
   "name": "GitHub Pull Request Mark All Files as",
-  "version": "1.0.5",
+  "version": "1.1.0",
+  "description": "Mark GitHub pull request files viewed or unviewed with custom buttons and file patterns.",
+  "background": { "service_worker": "background.js" },
+  "permissions": ["storage"],
+  "options_ui": { "page": "options.html", "open_in_tab": true },
   "host_permissions": ["https://github.com/**"],
   "content_scripts": [
     {
       "matches": ["https://github.com/**/pull/**"],
-      "js": ["content.js"]
+      "js": ["settings.js", "content.js"]
     }
   ],
   "homepage_url": "https://github.com/Dunky13/gh-review-mark-files-as",

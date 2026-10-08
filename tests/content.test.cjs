@@ -3,6 +3,7 @@ const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
 const { JSDOM, VirtualConsole } = require('jsdom');
 
+const settingsSource = readFileSync('settings.js', 'utf8');
 const source = readFileSync(process.env.CONTENT_SCRIPT_PATH || 'content.js', 'utf8');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -34,7 +35,7 @@ function classicPage(states = [true, false, false]) {
   return '<div class="pr-review-tools"><span class="js-review-count">1 / 3 viewed</span></div><div class="js-diff-progressive-container">' + states.map((checked, index) => `<div class="file" data-path="src/file-${index}.js"><input type="checkbox" id="viewed-${index}" class="js-reviewed-checkbox" ${checked ? 'checked' : ''}></div>`).join('') + '</div>';
 }
 
-function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender = false, iconOnly = false } = {}) {
+function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender = false, iconOnly = false, patterns, storageError } = {}) {
   const errors = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', (error) => errors.push(error));
@@ -65,9 +66,27 @@ function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender 
     };
     rerender ? dom.window.setTimeout(update, 15) : update();
   });
+  const wrap = value => value === undefined || value.buttons ? value : { buttons: [{ id: 'matching', name: 'Matching Files', ...value }] };
+  let storedPatterns = wrap(patterns);
+  const listeners = [];
+  dom.window.chrome = {
+    runtime: { sendMessage: async () => ({ opened: true }) },
+    storage: {
+      local: { get: async () => {
+        if (storageError) throw new Error(storageError);
+        return { filePatterns: storedPatterns };
+      } },
+      onChanged: { addListener: listener => listeners.push(listener) },
+    },
+  };
+  dom.window.eval(settingsSource);
   dom.window.eval(source);
   return {
     document, window: dom.window, errors, clicks,
+    setPatterns: value => {
+      storedPatterns = wrap(value);
+      for (const listener of listeners) listener({ filePatterns: { newValue: storedPatterns } }, 'local');
+    },
     control: () => document.querySelector('#viewed-state-checkbox'),
     states: () => Array.from(document.querySelectorAll('input.js-reviewed-checkbox, button[class*="MarkAsViewedButton-module__"]'), (node) => node.tagName === 'INPUT' ? node.checked : iconOnly ? !!node.querySelector('.octicon-checkbox-fill') : node.getAttribute('aria-pressed') === 'true'),
   };
@@ -240,4 +259,105 @@ test('reports a GitHub state update that never acknowledges instead of showing s
   assert.deepEqual(page.states(), [false, false, false]);
   assert.equal(page.control().checked, false);
   assert.match(page.document.querySelector('#viewed-state-error').textContent, /did not update/);
+});
+
+for (const classic of [false, true]) {
+  test(`patterns scope the complete viewed/unviewed/restore cycle on ${classic ? 'classic' : 'React'} pages`, async t => {
+    const html = classic ? classicPage([true, false, true]) : modernPage([true, false, true]);
+    const page = setup(t, html, undefined, { patterns: { include: '**/file-?.js', exclude: '**/file-2.js' }, rerender: !classic });
+    await waitFor(() => page.control(), 'Filtered control missing');
+    assert.equal(page.document.querySelector('#viewed-state-label').textContent, 'Mark Matching Files (2)');
+    for (const expected of [[true, true, true], [false, false, true], [true, false, true]]) {
+      page.control().click();
+      await waitFor(() => JSON.stringify(page.states()) === JSON.stringify(expected), 'A nonmatching file changed or a matching file was missed');
+      await waitFor(() => !page.control().disabled, 'Filtered batch stayed busy');
+    }
+  });
+}
+
+test('live settings changes, reset, missing paths, and no matches update the control safely', async t => {
+  const page = setup(t, modernPage([false, false, false]));
+  await waitFor(() => page.control(), 'Control missing');
+  page.setPatterns({ include: '**/*.test.js', exclude: '' });
+  await waitFor(() => page.control().disabled, 'No-match control should be disabled');
+  assert.equal(page.document.querySelector('#viewed-state-label').textContent, 'Mark Matching Files (0)');
+  page.document.querySelector('#diff-0').removeAttribute('aria-label');
+  page.document.querySelector('#diff-0 a').remove();
+  page.setPatterns({ include: '**/*.js', exclude: '' });
+  await waitFor(() => !page.control().disabled, 'Live settings did not apply');
+  assert.equal(page.document.querySelector('#viewed-state-label').textContent, 'Mark Matching Files (2)');
+  page.control().click();
+  await waitFor(() => JSON.stringify(page.states()) === '[false,true,true]', 'Unknown path was changed');
+  await waitFor(() => !page.control().disabled, 'Batch stayed busy');
+  page.setPatterns(undefined);
+  await waitFor(() => page.document.querySelector('#viewed-state-label').textContent === 'Mark All Files', 'Reset did not restore default scope');
+  assert.equal(page.document.querySelector('#viewed-state-settings').textContent, 'Settings');
+});
+
+test('storage errors and invalid settings disable bulk updates until repaired', async t => {
+  const page = setup(t, modernPage([false, false, false]), undefined, { storageError: 'Storage unavailable' });
+  await waitFor(() => page.control(), 'Control missing');
+  assert.equal(page.control().disabled, true);
+  assert.match(page.control().title, /Storage unavailable/);
+  page.setPatterns({ include: 123, exclude: '' });
+  await delay(20);
+  assert.equal(page.control().disabled, true);
+  assert.match(page.control().title, /invalid/);
+  page.setPatterns({ include: '', exclude: '**/file-1.js' });
+  await waitFor(() => !page.control().disabled, 'Repaired settings did not recover');
+  page.control().click();
+  await waitFor(() => JSON.stringify(page.states()) === '[true,false,true]', 'Exclude-only scope failed');
+});
+
+test('settings scope is retained when the toolbar rerenders and another PR opens', async t => {
+  const page = setup(t, modernPage([false, false, false]), undefined, { patterns: { include: '**/file-1.js', exclude: '' } });
+  await waitFor(() => page.control(), 'Control missing');
+  page.document.querySelector('.d-flex').outerHTML = toolbar();
+  await waitFor(() => page.control(), 'Control missing after toolbar rerender');
+  assert.equal(page.document.querySelectorAll('#viewed-state-settings').length, 1);
+  page.window.history.pushState({}, '', '/org/repo/pull/99/files');
+  page.document.body.innerHTML = modernPage([false, false, false]);
+  page.document.dispatchEvent(new page.window.Event('turbo:load'));
+  await waitFor(() => page.control(), 'Control missing on new PR');
+  page.control().click();
+  await waitFor(() => JSON.stringify(page.states()) === '[false,true,false]', 'Settings lost on navigation');
+});
+
+test('multiple buttons have independent scopes and keep overlapping button states synchronized', async t => {
+  const page = setup(t, modernPage([false, false, false]), undefined, { rerender: true, patterns: { buttons: [
+    { id: 'tests', name: 'Tests', include: '**/file-0.js\n**/file-1.js', exclude: '' },
+    { id: 'docs', name: 'Docs', include: '**/file-1.js\n**/file-2.js', exclude: '' },
+  ] } });
+  await waitFor(() => page.control(), 'Buttons missing');
+  const docs = () => page.document.querySelector('#viewed-state-checkbox-docs');
+  assert.equal(page.document.querySelectorAll('#viewed-state-controls input').length, 2);
+  page.control().click();
+  assert.equal(docs().disabled, true, 'Sibling button allowed concurrent batches');
+  await waitFor(() => !page.control().disabled, 'Tests batch stayed busy');
+  assert.deepEqual(page.states(), [true, true, false]);
+  assert.equal(docs().indeterminate, true);
+  docs().click();
+  await waitFor(() => !docs().disabled, 'Docs batch stayed busy');
+  assert.deepEqual(page.states(), [true, true, true]);
+  assert.equal(page.control().checked, true);
+  page.control().click();
+  await waitFor(() => !page.control().disabled, 'Tests unview batch stayed busy');
+  assert.deepEqual(page.states(), [false, false, true]);
+  assert.equal(docs().indeterminate, true);
+  page.setPatterns({ buttons: [{ id: 'docs', name: 'Documentation', include: '**/file-2.js', exclude: '' }] });
+  await waitFor(() => page.document.querySelectorAll('#viewed-state-controls input').length === 1, 'Removed button stayed mounted');
+  assert.equal(page.document.querySelector('#viewed-state-label').textContent, 'Mark Documentation (1)');
+  page.setPatterns({ buttons: [] });
+  await waitFor(() => !page.control(), 'Empty configuration still shows a button');
+  assert.ok(page.document.querySelector('#viewed-state-settings'), 'Settings must remain accessible with no buttons');
+});
+
+test('settings changes during a batch apply to the next action without expanding its targets', async t => {
+  const page = setup(t, modernPage([false, false, false]), undefined, { rerender: true, patterns: { include: '**/file-0.js', exclude: '' } });
+  await waitFor(() => page.control(), 'Button missing');
+  page.control().click();
+  page.setPatterns({ include: '**/*.js', exclude: '' });
+  await waitFor(() => !page.control().disabled, 'Batch stayed busy');
+  assert.deepEqual(page.states(), [true, false, false]);
+  assert.equal(page.document.querySelector('#viewed-state-label').textContent, 'Mark Matching Files (3)');
 });

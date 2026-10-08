@@ -22,7 +22,7 @@ jobs:
     - name: Pack Chrome Extension
       run: |
         mkdir -p build
-        zip -r build/extension.zip manifest.json content.js images LICENSE
+        zip -r build/extension.zip manifest.json content.js background.js settings.js options.html options.js options.css images LICENSE
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
