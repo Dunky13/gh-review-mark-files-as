@@ -45,9 +45,19 @@
 
   function filePath(file) {
     const diff = file.closest('[data-path], [data-file-path], [role="region"][id], [class*="Diff-module"][id]');
-    return diff?.getAttribute('data-path') || diff?.getAttribute('data-file-path')
-      || diff?.querySelector('a[href^="#diff-"][title]')?.getAttribute('title')
-      || diff?.getAttribute('aria-label') || '';
+    const explicitPath = diff?.getAttribute('data-path') || diff?.getAttribute('data-file-path')
+      || diff?.querySelector('a[href^="#diff-"][title]')?.getAttribute('title');
+    if (explicitPath) return explicitPath;
+    // Current GitHub headers use an untitled link and aria-labelledby on the
+    // region. Read the header's code text, not arbitrary text from the diff.
+    const code = diff?.querySelector('[data-diff-header-wrapper] h3 a[href^="#diff-"] code');
+    if (code && !code.children.length) {
+      // GitHub wraps the filename in left-to-right markers for display.
+      return code.textContent.replace(/^\u200e|\u200e$/g, '');
+    }
+    // A rename header has separate visible and accessible descriptions, not
+    // one plain path. Leave it untouched rather than matching display text.
+    return diff?.getAttribute('aria-label') || '';
   }
 
   function getTargetFiles(button) {
@@ -93,12 +103,16 @@
       : `Mark ${button.name} (${files.length})`;
     const labelText = control.nextElementSibling;
     if (labelText && labelText.textContent !== text) labelText.textContent = text;
-    const title = settingsError || (!settingsReady ? 'Loading file patterns…' : filter.active
+    const unknownPaths = filter.active ? getFiles().filter(file => !filePath(file)).length : 0;
+    const title = settingsError || (!settingsReady ? 'Loading file patterns…' : filter.active && files.length === 0
+      ? `No matching loaded files.${unknownPaths ? ` Could not read paths for ${unknownPaths} loaded file${unknownPaths === 1 ? '' : 's'}.` : ' Check your patterns or load more files.'}`
+      : filter.active
       ? 'Cycle matching loaded files between viewed, unviewed, and their original selection. Other files stay untouched.'
       : partial
       ? 'Only loaded files can be changed. Load the remaining files to include them.'
       : 'Cycle between all viewed, none viewed, and the original selection');
     if (control.title !== title) control.title = title;
+    if (control.parentElement.title !== title) control.parentElement.title = title;
   }
 
   function synchronize() {

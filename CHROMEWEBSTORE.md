@@ -1,6 +1,6 @@
 # Chrome Web Store listing
 
-Last updated: 2026-10-08
+Last updated: 2026-10-09
 
 ## Store listing
 
@@ -55,6 +55,7 @@ Icons remain unchanged (`images/icon.128.png` is the store icon). Existing publi
 
 ## Version history
 
+- 1.1.1 — 2026-10-09: Recognize filenames in GitHub's current untitled diff-header links and explain zero-target buttons. Publication status must be verified from the release workflow and store.
 - 1.1.0 — 2026-10-08: Configurable named buttons, include/exclude patterns, compact settings, individual pattern rows, and bounded wildcard matching. Prepared for submission by the main-branch publishing workflow; check the workflow and store for actual publication/review state.
 - 1.0.5 — 2026-10-07: Compatibility with GitHub's redesigned pull request pages. Public listing confirmed at 1.0.5 before this release.
 

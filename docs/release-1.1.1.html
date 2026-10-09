@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Release 1.1.1 handoff</title><style>body{max-width:850px;margin:40px auto;padding:0 24px;font:16px/1.6 system-ui;color:#17212b;background:#fafafa}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}</style><body><pre># Release 1.1.1 handoff
+
+Filtered buttons could show zero matches on GitHub&#x27;s redesigned pull request pages even when matching files were loaded. The extension looked for a titled diff link or path-valued aria-label. GitHub&#x27;s current renderer instead uses an untitled link with a plain filename code element and aria-labelledby on the file region.
+
+The fix reads the plain filename from the corresponding file-header wrapper and removes GitHub&#x27;s surrounding U+200E display markers. It preserves classic path sources and leaves ambiguous rename descriptions untouched without an explicit path. Zero-target tooltips explain missing paths or unmatched/unloaded files and also appear on the surrounding label when the checkbox is disabled.
+
+## Evidence and validation
+
+Source-derived fixtures use GitHub&#x27;s public DiffUnmemoized and DiffFileHeader renderers:
+
+- https://github.githubassets.com/assets/ux-3d12fe8ed63c00d2.js
+- https://github.githubassets.com/assets/jf-a46481f0216cad9e.js
+
+New regression tests fail against 1.1.0 with Mark Tests (0) instead of Mark Tests (4), then pass with the fix on both /files and /changes. Tests cover a second Tests button using **/*.test.*, asynchronous replacement of all Viewed controls, marking/unmarking, root filenames, exclusions, unrelated code text, and ambiguous rename safety.
+
+All 34 Node/jsdom tests, the four runtime-script syntax checks, and git diff --check pass locally. A browser fixture with 17 file controls reproduced zero targets before the fix and four targets after; clicking marked exactly those four files and clicking again unmarked them. The reported private PR was not tested in an authenticated browser session; GitHub state acknowledgement was simulated in the fixture.
+
+## Delivery
+
+Manifest version: 1.1.1. The main-branch Publish Chrome Extension workflow tests the merge commit, packages runtime files and icons, uploads the ZIP artifact, and invokes the existing Chrome Web Store publish action for cdodhippkioagjgbchpljiboecdljklm.
+
+Verify the exact-head PR checks before merging and the exact-merge release workflow after merging. Upload success, publish-request acceptance, Google review, and public availability are separate states. This handoff does not assert public availability.
+</pre></body></html>

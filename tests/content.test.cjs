@@ -361,3 +361,54 @@ test('settings changes during a batch apply to the next action without expanding
   assert.deepEqual(page.states(), [true, false, false]);
   assert.equal(page.document.querySelector('#viewed-state-label').textContent, 'Mark Matching Files (3)');
 });
+
+// Structure derived from GitHub's DiffUnmemoized and DiffFileHeader renderer:
+// https://github.githubassets.com/assets/ux-3d12fe8ed63c00d2.js
+// https://github.githubassets.com/assets/jf-a46481f0216cad9e.js
+function currentGitHubFile(name, index, checked) {
+  return `<section role="region" id="diff-${index}" aria-labelledby="heading-${index}" class="Diff-module__diff__rx9XH"><div data-diff-header-wrapper><h3 id="heading-${index}"><a href="#diff-${index}"><code>\u200e${name}\u200e</code></a></h3><button class="MarkAsViewedButton-module__iconOnly__kEP4e" aria-pressed="${checked}">Viewed</button></div></section>`;
+}
+
+for (const route of ['files', 'changes']) {
+  test(`second Tests button recognizes current GitHub headers on /${route}`, async t => {
+    const names = [
+      'src/mail/send.test.ts',
+      'src/orders/finalize.test.ts',
+      'src/orders/log.test.ts',
+      'src/orders/utils/project.test.ts',
+      'src/orders/processing.ts',
+    ];
+    const page = setup(t, toolbar() + names.map((name, index) => currentGitHubFile(name, index, false)).join(''), `/org/repo/pull/3247/${route}`, { rerender: true, patterns: { buttons: [
+      { id: 'all', name: 'All Files', include: '', exclude: '' },
+      { id: 'tests', name: 'Tests', include: '**/*.test.*', exclude: '' },
+    ] } });
+    await waitFor(() => page.control(), 'Buttons missing');
+    const tests = () => page.document.querySelector('#viewed-state-checkbox-tests');
+    assert.equal(tests().nextElementSibling.textContent, 'Mark Tests (4)');
+    assert.equal(tests().disabled, false);
+    tests().nextElementSibling.click();
+    await waitFor(() => JSON.stringify(page.states()) === '[true,true,true,true,false]', 'Matching tests were missed or production file changed');
+    await waitFor(() => !tests().disabled, 'Tests batch stayed busy');
+    tests().click();
+    await waitFor(() => JSON.stringify(page.states()) === '[false,false,false,false,false]', 'Tests did not unmark');
+  });
+}
+
+test('current header paths preserve exclusions and leave ambiguous or unrelated text untouched', async t => {
+  const html = toolbar()
+    + currentGitHubFile('root.test.ts', 0, false)
+    + currentGitHubFile('fixtures/data.test.ts', 1, false)
+    + currentGitHubFile('src/main.ts', 2, false)
+    + currentGitHubFile('src/renamed.test.ts', 3, false).replace('<code>\u200esrc/renamed.test.ts\u200e</code>', '<code><span aria-hidden="true">old.ts → renamed.test.ts</span><span class="sr-only">old.ts renamed to renamed.test.ts </span></code>');
+  const page = setup(t, html, undefined, { patterns: { include: '**/*.test.*', exclude: '**/fixtures/**' } });
+  page.document.querySelector('#diff-2').insertAdjacentHTML('beforeend', '<pre><code>src/unrelated.test.ts</code></pre>');
+  await waitFor(() => page.control(), 'Button missing');
+  assert.equal(page.control().nextElementSibling.textContent, 'Mark Matching Files (1)');
+  page.control().click();
+  await waitFor(() => JSON.stringify(page.states()) === '[true,false,false,false]', 'Exclusion or unknown-path safety failed');
+  await waitFor(() => !page.control().disabled, 'Batch stayed busy');
+  page.setPatterns({ include: '**/*.spec.*', exclude: '' });
+  await waitFor(() => page.control().disabled, 'Zero-target button was enabled');
+  assert.match(page.control().title, /No matching loaded files.*Could not read paths for 1 loaded file\./);
+  assert.equal(page.control().parentElement.title, page.control().title, 'Disabled input needs a tooltip on its label');
+});

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GitHub Pull Request Mark All Files as",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Mark GitHub pull request files viewed or unviewed with custom buttons and file patterns.",
   "background": { "service_worker": "background.js" },
   "permissions": ["storage"],
