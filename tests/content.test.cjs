@@ -44,7 +44,7 @@ function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender 
   const { document } = dom.window;
   const clicks = [];
   document.addEventListener('click', (event) => {
-    const button = event.target.closest('button[class*="MarkAsViewedButton-module__"]');
+    const button = event.target.closest('button[class*="MarkAsViewedButton-module__"], button[aria-label="Viewed"][aria-pressed], button[aria-label="Not Viewed"][aria-pressed]');
     if (!button) return;
     const section = button.closest('section');
     clicks.push(section.id);
@@ -88,7 +88,7 @@ function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender 
       for (const listener of listeners) listener({ filePatterns: { newValue: storedPatterns } }, 'local');
     },
     control: () => document.querySelector('#viewed-state-checkbox'),
-    states: () => Array.from(document.querySelectorAll('input.js-reviewed-checkbox, button[class*="MarkAsViewedButton-module__"]'), (node) => node.tagName === 'INPUT' ? node.checked : iconOnly ? !!node.querySelector('.octicon-checkbox-fill') : node.getAttribute('aria-pressed') === 'true'),
+    states: () => Array.from(document.querySelectorAll('input.js-reviewed-checkbox, button[class*="MarkAsViewedButton-module__"], button[aria-label="Viewed"][aria-pressed], button[aria-label="Not Viewed"][aria-pressed]'), (node) => node.tagName === 'INPUT' ? node.checked : iconOnly ? !!node.querySelector('.octicon-checkbox-fill') : node.getAttribute('aria-pressed') === 'true'),
   };
 }
 
@@ -149,7 +149,7 @@ test('mounts after delayed DOM insertion and remounts after GitHub replaces its 
   const page = setup(t, '<main></main>');
   await delay(30);
   page.document.querySelector('main').innerHTML = modernPage();
-  await waitFor(() => page.control(), 'Control missing after delayed DOM insertion');
+  await waitFor(() => page.control()?.indeterminate && page.document.querySelector('#viewed-state-toolbar').dataset.placement === 'inline', 'Loaded files did not update the tools after delayed DOM insertion');
   page.document.querySelector('.d-flex').outerHTML = toolbar();
   await waitFor(() => page.control(), 'Control missing after toolbar remount');
   assert.equal(page.control().indeterminate, true);
@@ -411,4 +411,85 @@ test('current header paths preserve exclusions and leave ambiguous or unrelated 
   await waitFor(() => page.control().disabled, 'Zero-target button was enabled');
   assert.match(page.control().title, /No matching loaded files.*Could not read paths for 1 loaded file\./);
   assert.equal(page.control().parentElement.title, page.control().title, 'Disabled input needs a tooltip on its label');
+});
+
+// Progress markup captured from the reported GitHub page on 2026-10-19.
+function accessibleToolbar(total = 7) {
+  return `<div id="review-toolbar"><div class="hide-viewed-progress-on-small__u9jCpF"><span aria-hidden="true" class="ProgressContainer__b1ofBm"><span>0</span> / <span>${total}</span> <span>viewed</span></span><span class="sr-only">0 of ${total} files viewed</span></div><div><button>Submit review</button></div></div>`;
+}
+
+function accessibleFiles() {
+  return ['src/first.test.js', 'src/main.js', 'src/last.test.js'].map((name, index) => currentGitHubFile(name, index, false)
+    .replace('class="MarkAsViewedButton-module__iconOnly__kEP4e"', 'class="completely-new-class" aria-label="Not Viewed"')).join('');
+}
+
+for (const route of ['files', 'changes']) {
+  test(`uses accessible progress and Viewed labels after GitHub class changes on /${route}`, async t => {
+    const page = setup(t, accessibleToolbar() + accessibleFiles(), `/org/repo/pull/1007/${route}`, { rerender: true });
+    await waitFor(() => page.control(), 'Controls missing with captured GitHub markup');
+    assert.equal(page.control().nextElementSibling.textContent, 'Mark Loaded Files');
+    const ownedToolbar = page.document.querySelector('#viewed-state-toolbar');
+    assert.equal(ownedToolbar.parentElement.id, 'review-toolbar');
+    assert.equal(ownedToolbar.closest('[class*="hide-viewed-progress"]'), null, 'Tools must stay outside the responsive progress wrapper');
+    page.control().click();
+    await waitFor(() => page.states().every(Boolean), 'Accessible Viewed controls did not update');
+    await waitFor(() => !page.control().disabled, 'Batch stayed busy');
+    page.setPatterns({ include: '**/*.test.js', exclude: '' });
+    await waitFor(() => page.control().nextElementSibling.textContent === 'Mark Matching Files (2)', 'Custom scope lost');
+    page.control().click();
+    await waitFor(() => JSON.stringify(page.states()) === '[false,true,false]', 'Nonmatching file was changed');
+  });
+}
+
+test('class-free progress, nested wrappers, and toolbar replacement retain one set of controls', async t => {
+  const html = accessibleToolbar(3).replaceAll(/ class="[^"]*"/g, '');
+  const page = setup(t, html + accessibleFiles());
+  await waitFor(() => page.control(), 'Controls depend on progress CSS classes');
+  assert.equal(page.control().nextElementSibling.textContent, 'Mark All Files');
+  const replacement = html.replace('0 of 3 files viewed', '0 of 7 files viewed').replace('<span>3</span>', '<span>7</span>');
+  page.document.querySelector('#review-toolbar').outerHTML = replacement;
+  await waitFor(() => page.control()?.nextElementSibling.textContent === 'Mark Loaded Files', 'Toolbar replacement lost the progress count');
+  assert.equal(page.document.querySelectorAll('#viewed-state-toolbar').length, 1);
+  assert.equal(page.document.querySelectorAll('#viewed-state-settings').length, 1);
+});
+
+test('missing toolbar anchors leave usable independent tools and unknown totals stay conservative', async t => {
+  const page = setup(t, accessibleFiles());
+  await waitFor(() => page.control(), 'Tools disappeared when GitHub toolbar could not be identified');
+  assert.equal(page.control().nextElementSibling.textContent, 'Mark Loaded Files');
+  assert.equal(page.document.querySelector('#viewed-state-toolbar').dataset.placement, 'floating');
+  assert.ok(page.document.querySelector('#viewed-state-settings'));
+  page.control().click();
+  await waitFor(() => page.states().every(Boolean), 'Independent controls are unusable');
+  page.document.body.insertAdjacentHTML('afterbegin', accessibleToolbar(3));
+  await waitFor(() => page.document.querySelector('#viewed-state-toolbar').parentElement.id === 'review-toolbar', 'Tools did not return to the toolbar');
+  assert.equal(page.document.querySelector('#viewed-state-toolbar').dataset.placement, 'inline');
+  assert.equal(page.document.querySelectorAll('#viewed-state-toolbar').length, 1);
+  page.window.history.pushState({}, '', '/org/repo/pull/1007');
+  page.document.dispatchEvent(new page.window.Event('turbo:load'));
+  await waitFor(() => !page.document.querySelector('#viewed-state-toolbar'), 'Independent tools leaked outside the diff route');
+});
+
+test('file content imitating progress or Submit review is not a toolbar anchor', async t => {
+  const page = setup(t, accessibleFiles());
+  page.document.querySelector('#diff-0').insertAdjacentHTML('beforeend', '<pre><span>0 of 999 files viewed</span><button>Submit review</button></pre>');
+  await waitFor(() => page.control(), 'Independent toolbar missing');
+  assert.equal(page.document.querySelector('#viewed-state-toolbar').dataset.placement, 'floating');
+  assert.equal(page.control().nextElementSibling.textContent, 'Mark Loaded Files');
+  assert.equal(page.document.querySelector('pre #viewed-state-toolbar'), null);
+});
+
+test('ARIA progress metadata and labelled file headings survive changed tags and header attributes', async t => {
+  const html = '<div role="toolbar" aria-label="Pull request review"><div role="progressbar" aria-label="Files viewed" aria-valuemax="7"></div><button aria-label="Submit review">Review</button></div>';
+  const page = setup(t, html + accessibleFiles().replaceAll(' data-diff-header-wrapper', ''), undefined, { patterns: { include: '**/*.test.js', exclude: '' } });
+  await waitFor(() => page.control(), 'ARIA toolbar missing');
+  assert.equal(page.document.querySelector('#viewed-state-toolbar').dataset.placement, 'inline');
+  assert.equal(page.control().nextElementSibling.textContent, 'Mark Matching Files (2)');
+  page.control().click();
+  await waitFor(() => JSON.stringify(page.states()) === '[true,false,true]', 'Labelled headings did not preserve filtered paths');
+  await waitFor(() => !page.control().disabled, 'Batch stayed busy');
+  page.setPatterns(undefined);
+  await waitFor(() => page.control().nextElementSibling.textContent === 'Mark Loaded Files', 'ARIA total was ignored');
+  page.document.querySelector('[role="progressbar"]').setAttribute('aria-valuemax', '3');
+  await waitFor(() => page.control().nextElementSibling.textContent === 'Mark All Files', 'ARIA progress updates were ignored');
 });

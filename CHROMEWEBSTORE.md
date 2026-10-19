@@ -1,6 +1,6 @@
 # Chrome Web Store listing
 
-Last updated: 2026-10-09
+Last updated: 2026-10-19
 
 ## Store listing
 
@@ -17,6 +17,8 @@ Create named review buttons for tests, documentation, or any file patterns. Each
 Open Settings from the extension icon or the pull request toolbar. Add patterns with individual fields and +/− controls, then select Save. Settings stay in this browser and apply across repositories.
 
 Works on both Files changed layouts. Only files loaded on the page can be changed. Cycle matching files through viewed, unviewed, and their original selection when mixed.
+
+If GitHub's toolbar changes, review controls remain available in a floating panel and return to the toolbar when it is recognized again.
 
 Support: https://github.com/Dunky13/gh-review-mark-files-as/issues
 
@@ -53,8 +55,11 @@ Distribution: Existing public listing; do not change regions or visibility as pa
 
 Icons remain unchanged (`images/icon.128.png` is the store icon). Existing public screenshots show the original Mark All Files feature, which remains available. Future listing edits should also show the compact custom-button settings with individual pattern fields. The automated release uploads the extension package; it does not edit listing copy or screenshots.
 
+The 1.1.2 compatibility update supplies its own button styling and a floating fallback panel. Refresh toolbar screenshots and include the fallback panel before updating the listing assets.
+
 ## Version history
 
+- 1.1.2 — 2026-10-19: Detect review progress using accessible text and ARIA metadata, preserve controls when the toolbar cannot be identified, and provide independent control styling. Prepared for submission; verify the release workflow and public listing for publication status.
 - 1.1.1 — 2026-10-09: Recognize filenames in GitHub's current untitled diff-header links and explain zero-target buttons. Publication status must be verified from the release workflow and store.
 - 1.1.0 — 2026-10-08: Configurable named buttons, include/exclude patterns, compact settings, individual pattern rows, and bounded wildcard matching. Prepared for submission by the main-branch publishing workflow; check the workflow and store for actual publication/review state.
 - 1.0.5 — 2026-10-07: Compatibility with GitHub's redesigned pull request pages. Public listing confirmed at 1.0.5 before this release.
