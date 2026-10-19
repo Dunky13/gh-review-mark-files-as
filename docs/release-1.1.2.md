@@ -1,5 +1,7 @@
 # Release 1.1.2 handoff
 
+Pull request: https://github.com/Dunky13/gh-review-mark-files-as/pull/5
+
 GitHub's changed progress-indicator classes caused every extension control, including Settings, to disappear. The affected page still exposed seven Viewed buttons, but neither toolbar selector matched. A fixture with the captured markup reproduced the failure; the existing 34 tests used the older progress class.
 
 ## Resulting behavior
