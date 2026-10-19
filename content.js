@@ -6,6 +6,8 @@
     'button[aria-label="Not Viewed"][aria-pressed]',
   ].join(',');
   const initialFileStates = new Map();
+  const fileRegionSelector = '[data-path], [data-file-path], [role="region"][id], [class*="Diff-module"][id]';
+  let progressElement = null;
   let page = '';
   let busy = false;
   let scheduled = false;
@@ -44,13 +46,16 @@
   })();
 
   function filePath(file) {
-    const diff = file.closest('[data-path], [data-file-path], [role="region"][id], [class*="Diff-module"][id]');
+    const diff = file.closest(fileRegionSelector);
     const explicitPath = diff?.getAttribute('data-path') || diff?.getAttribute('data-file-path')
       || diff?.querySelector('a[href^="#diff-"][title]')?.getAttribute('title');
     if (explicitPath) return explicitPath;
     // Current GitHub headers use an untitled link and aria-labelledby on the
     // region. Read the header's code text, not arbitrary text from the diff.
-    const code = diff?.querySelector('[data-diff-header-wrapper] h3 a[href^="#diff-"] code');
+    const headings = (diff?.getAttribute('aria-labelledby') || '').split(/\s+/)
+      .map(id => document.getElementById(id)).filter(heading => heading && diff.contains(heading));
+    const code = headings.map(heading => heading.querySelector('a[href^="#diff-"] code')).find(Boolean)
+      || diff?.querySelector('[data-diff-header-wrapper] h3 a[href^="#diff-"] code');
     if (code && !code.children.length) {
       // GitHub wraps the filename in left-to-right markers for display.
       return code.textContent.replace(/^\u200e|\u200e$/g, '');
@@ -70,7 +75,7 @@
   }
 
   function fileKey(file) {
-    const diff = file.closest('[data-path], [data-file-path], [role="region"][id], [class*="Diff-module"][id]');
+    const diff = file.closest(fileRegionSelector);
     return diff?.getAttribute('data-path') || diff?.getAttribute('data-file-path') || diff?.id || file.id || file;
   }
 
@@ -81,13 +86,87 @@
     return Boolean(file.querySelector('.octicon-checkbox-fill'));
   }
 
-  function getHeader() {
-    return document.querySelector('.pr-review-tools')
-      || document.querySelector('[class*="ViewedFileProgress"]')?.closest('.d-flex')
-      || document.querySelector('[class*="ViewedFileProgress"]')?.parentElement;
+  function isFileContent(element) {
+    return Boolean(element.closest(`${fileRegionSelector}, pre, code, #viewed-state-toolbar`));
   }
 
-  function updateControl(control, files, button) {
+  function readProgress(element) {
+    if (!element?.isConnected || isFileContent(element)) return null;
+    const label = element.getAttribute('aria-label') || '';
+    const text = label || element.textContent.trim();
+    const count = text.match(/^(\d+)\s*(?:\/|of)\s*(\d+)\s+(?:files?\s+)?viewed$/i);
+    if (count) return { element, total: Number(count[2]) };
+    const max = element.getAttribute('aria-valuemax');
+    if (element.getAttribute('role') === 'progressbar' && /files?\s+viewed|viewed\s+files?/i.test(label) && /^\d+$/.test(max || '')) {
+      return { element, total: Number(max) };
+    }
+    return null;
+  }
+
+  function getProgress() {
+    const cached = readProgress(progressElement);
+    if (cached) return cached;
+    // Accessible names and the screen-reader count survive CSS-module renames.
+    // Keep the older hooks for GitHub's classic layout and older React pages.
+    const candidates = document.querySelectorAll('[aria-label], [role="progressbar"], span, .js-review-count, [class*="ViewedFileProgress"]');
+    for (const element of candidates) {
+      if (element.children.length && !element.hasAttribute('aria-label') && !element.matches('.js-review-count, [class*="ViewedFileProgress"]')) continue;
+      const progress = readProgress(element);
+      if (progress) {
+        progressElement = element;
+        return progress;
+      }
+    }
+    return null;
+  }
+
+  function getHeader(progress) {
+    const review = Array.from(document.querySelectorAll('button, [role="button"]')).find(button =>
+      !isFileContent(button) && /^(?:submit|finish)\s+review\b/i.test((button.getAttribute('aria-label') || button.textContent).trim()));
+    if (progress && review) {
+      // Mount alongside both controls, never inside the progress-only wrapper
+      // that GitHub hides on narrow screens. Do not climb into the file list.
+      for (let parent = progress.element.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+        if (parent.querySelector(viewedSelector)) break;
+        if (parent.contains(review)) return parent;
+      }
+    }
+    const toolbar = review?.closest('[role="toolbar"]');
+    if (toolbar && !toolbar.querySelector(viewedSelector)) return toolbar;
+    return Array.from(document.querySelectorAll('.pr-review-tools')).find(element => !isFileContent(element))
+      || Array.from(document.querySelectorAll('[class*="ViewedFileProgress"]')).find(element => !isFileContent(element))?.closest('.d-flex');
+  }
+
+  function mountToolbar(header) {
+    let toolbar = document.querySelector('#viewed-state-toolbar');
+    if (!toolbar) {
+      toolbar = document.createElement('div');
+      toolbar.id = 'viewed-state-toolbar';
+      toolbar.setAttribute('role', 'group');
+      toolbar.setAttribute('aria-label', 'File review tools');
+      const style = document.createElement('style');
+      style.textContent = `
+        #viewed-state-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; max-width:100%; box-sizing:border-box; font:12px/1.4 system-ui,sans-serif; color:var(--fgColor-default,CanvasText); }
+        #viewed-state-toolbar[data-placement="floating"] { position:fixed; inset:auto 16px 16px auto; z-index:2147483646; max-width:calc(100vw - 32px); max-height:40vh; overflow:auto; padding:10px; border:1px solid var(--borderColor-default,GrayText); border-radius:8px; background:var(--bgColor-default,Canvas); box-shadow:0 4px 16px #0003; }
+        #viewed-state-controls { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
+        #viewed-state-controls label, #viewed-state-settings { display:inline-flex; align-items:center; gap:6px; box-sizing:border-box; max-width:100%; margin:0; padding:5px 9px; border:1px solid var(--borderColor-default,GrayText); border-radius:6px; font:inherit; font-weight:600; cursor:pointer; }
+        #viewed-state-controls label { background:var(--button-primary-bgColor-rest,#1f883d); color:var(--button-primary-fgColor-rest,#fff); }
+        #viewed-state-controls span { overflow-wrap:anywhere; min-width:0; }
+        #viewed-state-controls input { flex-shrink:0; margin:0; }
+        #viewed-state-settings { background:var(--bgColor-muted,ButtonFace); color:var(--fgColor-default,ButtonText); }
+        #viewed-state-toolbar :focus-visible { outline:2px solid var(--focus-outlineColor,Highlight); outline-offset:2px; }
+        #viewed-state-error { flex-basis:100%; overflow-wrap:anywhere; }
+      `;
+      toolbar.append(style);
+    }
+    const placement = header ? 'inline' : 'floating';
+    if (toolbar.dataset.placement !== placement) toolbar.dataset.placement = placement;
+    const target = header || document.body;
+    if (toolbar.parentElement !== target) header ? target.prepend(toolbar) : target.append(toolbar);
+    return toolbar;
+  }
+
+  function updateControl(control, files, button, total) {
     const filter = button.filter;
     const checked = files.filter(isViewed).length;
     const position = checked === 0 ? 0 : checked === files.length ? 2 : 1;
@@ -95,9 +174,8 @@
     control.indeterminate = position === 1;
     const disabled = busy || !settingsReady || Boolean(settingsError) || files.length === 0;
     if (control.disabled !== disabled) control.disabled = disabled;
-    const progress = document.querySelector('[class*="ViewedFileProgress"], .js-review-count');
-    const total = Number(progress?.textContent.match(/\d+\s*\/\s*(\d+)/)?.[1]);
-    const partial = total > getFiles().length;
+    // Without a trustworthy total, promise only the files actually loaded.
+    const partial = total === undefined || total > getFiles().length;
     const text = button.name === 'All Files' && !filter.active
       ? partial ? 'Mark Loaded Files' : 'Mark All Files'
       : `Mark ${button.name} (${files.length})`;
@@ -121,7 +199,9 @@
     const isFilesPage = /^\/[^/]+\/[^/]+\/pull\/\d+\/(?:files|changes)(?:\/|$)/.test(path);
     if (path !== page) {
       page = path;
+      progressElement = null;
       initialFileStates.clear();
+      document.querySelector('#viewed-state-toolbar')?.remove();
       document.querySelector('#viewed-state-controls')?.remove();
       document.querySelector('#viewed-state-error')?.remove();
       document.querySelector('#viewed-state-settings')?.remove();
@@ -133,13 +213,12 @@
       if (!initialFileStates.has(key)) initialFileStates.set(key, isViewed(file));
     }
     if (!settingsReady) return;
-    const header = getHeader();
-    if (!header) return;
+    const progress = getProgress();
+    const header = mountToolbar(getHeader(progress));
     let controls = document.querySelector('#viewed-state-controls');
     if (!controls) {
       controls = document.createElement('div');
       controls.id = 'viewed-state-controls';
-      controls.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap';
       header.prepend(controls);
     } else if (controls.parentElement !== header) header.prepend(controls);
     for (const label of Array.from(controls.children)) {
@@ -150,8 +229,6 @@
       if (!label) {
         label = document.createElement('label');
         label.dataset.buttonId = button.id;
-        label.className = 'diffbar-item Button--primary Button--small Button';
-        label.style.cssText = 'display:inline-flex;align-items:center;gap:6px;flex-shrink:0;cursor:pointer';
         const control = document.createElement('input');
         control.type = 'checkbox';
         const text = document.createElement('span');
@@ -166,7 +243,7 @@
       control.id = index === 0 ? 'viewed-state-checkbox' : `viewed-state-checkbox-${button.id}`;
       label.querySelector('span').id = index === 0 ? 'viewed-state-label' : `viewed-state-label-${button.id}`;
       if (controls.children[index] !== label) controls.insertBefore(label, controls.children[index] || null);
-      updateControl(control, getTargetFiles(button), button);
+      updateControl(control, getTargetFiles(button), button, progress?.total);
     });
     let settingsLink = document.querySelector('#viewed-state-settings');
     if (!settingsLink) {
@@ -174,7 +251,6 @@
       settingsLink.id = 'viewed-state-settings';
       settingsLink.textContent = 'Settings';
       settingsLink.type = 'button';
-      settingsLink.className = 'Button Button--small';
       settingsLink.addEventListener('click', async () => {
         try {
           const result = await chrome.runtime.sendMessage({ type: 'open-file-review-settings' });
@@ -190,7 +266,6 @@
           status.textContent = `Could not open Settings: ${error.message}. Try the extension’s Options menu.`;
         }
       });
-      settingsLink.style.cssText = 'margin-right:10px;flex-shrink:0';
     }
     if (controls.nextSibling !== settingsLink) controls.after(settingsLink);
   }
@@ -291,7 +366,7 @@
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ['aria-pressed', 'checked', 'class', 'disabled'],
+    attributeFilter: ['aria-pressed', 'aria-label', 'aria-valuemax', 'checked', 'class', 'disabled'],
   });
   document.addEventListener('change', scheduleSynchronize);
   document.addEventListener('click', scheduleSynchronize);

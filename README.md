@@ -4,7 +4,9 @@ Extension that adds a **Mark All Files** control to GitHub's pull request Files 
 
 Click to mark all files as viewed, click again to unmark them, and click again to restore the original selection if it was mixed. Individual Viewed changes keep the control in sync. The control survives GitHub's in-place navigation and toolbar rerenders.
 
-Only files whose Viewed controls are loaded on the page can be changed. When GitHub's progress count shows more files than are loaded, the control says **Mark Loaded Files**. Load the remaining files or leave the virtualized/single-file view to include them.
+Review tools use GitHub's accessible progress and control labels, with compatibility hooks for older layouts. If the toolbar cannot be identified, the tools appear in a floating panel at the bottom right. They return to the toolbar when it becomes available. The extension supplies its own control styling so GitHub button-class changes do not remove it.
+
+Only files whose Viewed controls are loaded on the page can be changed. When GitHub's progress count shows more files than are loaded, or the total cannot be determined, the control says **Mark Loaded Files**. Load the remaining files or leave the virtualized/single-file view to include them.
 
 ## Custom review buttons
 
