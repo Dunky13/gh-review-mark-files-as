@@ -18,6 +18,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24
+
+    - name: Check Chrome Web Store configuration
+      env:
+        PUBLISHER_ID: ${{ vars.CHROME_PUBLISHER_ID }}
+      run: ': "${PUBLISHER_ID:?Set the CHROME_PUBLISHER_ID repository variable to your Chrome Web Store publisher ID}"'
+
     # Step 3: Pack the Chrome Extension into a ZIP file
     - name: Pack Chrome Extension
       run: |
@@ -30,12 +40,12 @@ jobs:
         name: chrome-extension.zip
         path: build/extension.zip
 
-    - name: Upload to Chrome Web Store
-      uses: mobilefirstllc/cws-publish@latest
-      with:
-        action: 'publish'  # one of: upload, publish, testers
-        client_id: ${{ secrets.CLIENT }}
-        client_secret: ${{ secrets.SECRET }}
-        refresh_token: ${{ secrets.TOKEN }}
-        extension_id: 'cdodhippkioagjgbchpljiboecdljklm' 
-        zip_file: 'build/extension.zip'
+    - name: Upload and submit to Chrome Web Store (API v2)
+      # Omitting the subcommand uploads AND submits; `upload` alone only uploads.
+      run: npx --yes chrome-webstore-upload-cli@4.0.2 --source build/extension.zip
+      env:
+        PUBLISHER_ID: ${{ vars.CHROME_PUBLISHER_ID }}
+        EXTENSION_ID: cdodhippkioagjgbchpljiboecdljklm
+        CLIENT_ID: ${{ secrets.CLIENT }}
+        CLIENT_SECRET: ${{ secrets.SECRET }}
+        REFRESH_TOKEN: ${{ secrets.TOKEN }}

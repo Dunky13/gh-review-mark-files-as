@@ -70,3 +70,9 @@ The 1.1.2 compatibility update supplies its own button styling and a floating fa
 ## Known limits
 
 Only loaded files can be changed. Filters with active patterns leave files without an identifiable path untouched. Settings apply to every repository in this browser. Up to 20 buttons can be configured. Public store propagation and Google review are separate from upload/publish API acceptance.
+
+## Publishing automation
+
+The main-branch workflow uses Chrome Web Store API v2 through `chrome-webstore-upload-cli@4.0.2` on Node.js 24. It retains the existing `CLIENT`, `SECRET`, and `TOKEN` repository secrets. The `CHROME_PUBLISHER_ID` repository variable must contain the publisher account ID from the Developer Dashboard, not the extension ID or display name. It is configured for this repository.
+
+The CLI runs without a subcommand to upload and submit for review with `DEFAULT_PUBLISH`; `upload` alone would leave a draft. Existing store visibility and rollout settings remain in effect. See the [migration handoff](docs/cws-api-v2.md) or its [offline HTML version](docs/cws-api-v2.html) for evidence and release checks.
