@@ -1,6 +1,6 @@
 # Chrome Web Store listing
 
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 ## Store listing
 
@@ -18,6 +18,8 @@ Open Settings from the extension icon or the pull request toolbar. Add patterns 
 
 Works on both Files changed layouts. Only files loaded on the page can be changed. Cycle matching files through viewed, unviewed, and their original selection when mixed.
 
+Review tools also appear when you click through from GitHub notifications, the dashboard, or a repository to a pull request, without refreshing the page.
+
 If GitHub's toolbar changes, review controls remain available in a floating panel and return to the toolbar when it is recognized again.
 
 Support: https://github.com/Dunky13/gh-review-mark-files-as/issues
@@ -31,7 +33,7 @@ Language: English
 ## Permissions justification
 
 - `storage`: Save review button names and include/exclude patterns locally so users do not need to reconfigure them on each pull request.
-- `https://github.com/**`: Read loaded file paths and Viewed controls on GitHub pull requests and operate those controls when the user selects a review button. Content scripts are restricted to GitHub pull request pages.
+- `https://github.com/**`: Read loaded file paths and Viewed controls on GitHub pull requests and operate those controls when the user selects a review button. Content scripts start on GitHub pages so they can follow in-place navigation from the dashboard, notifications, and repositories. Review tools and file-state processing are limited to pull request `/files` and `/changes` routes.
 
 ## Privacy and data use
 
@@ -59,6 +61,7 @@ The 1.1.2 compatibility update supplies its own button styling and a floating fa
 
 ## Version history
 
+- 1.1.3 — 2026-10-20: Show review tools when opening a pull request through in-place navigation from another GitHub page. Prepared for the main-branch publishing workflow; verify its result and the public listing for publication status.
 - 1.1.2 — 2026-10-19: Detect review progress using accessible text and ARIA metadata, preserve controls when the toolbar cannot be identified, and provide independent control styling. Prepared for submission; verify the release workflow and public listing for publication status.
 - 1.1.1 — 2026-10-09: Recognize filenames in GitHub's current untitled diff-header links and explain zero-target buttons. Publication status must be verified from the release workflow and store.
 - 1.1.0 — 2026-10-08: Configurable named buttons, include/exclude patterns, compact settings, individual pattern rows, and bounded wildcard matching. Prepared for submission by the main-branch publishing workflow; check the workflow and store for actual publication/review state.

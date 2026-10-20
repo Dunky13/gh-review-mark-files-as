@@ -3,7 +3,7 @@ const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
 const { JSDOM, VirtualConsole } = require('jsdom');
 
-const settingsSource = readFileSync('settings.js', 'utf8');
+const manifest = require('../manifest.json');
 const source = readFileSync(process.env.CONTENT_SCRIPT_PATH || 'content.js', 'utf8');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -39,7 +39,7 @@ function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender 
   const errors = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', (error) => errors.push(error));
-  const dom = new JSDOM(html, { url: `https://github.com${route}`, runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole });
+  const dom = new JSDOM(html, { url: new URL(route, 'https://github.com').href, runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole });
   t.after(() => dom.window.close());
   const { document } = dom.window;
   const clicks = [];
@@ -79,8 +79,17 @@ function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender 
       onChanged: { addListener: listener => listeners.push(listener) },
     },
   };
-  dom.window.eval(settingsSource);
-  dom.window.eval(source);
+  // Respect the manifest at document load. Soft navigation must work without
+  // injecting again when the URL changes to a pull request.
+  for (const entry of manifest.content_scripts) {
+    const matches = entry.matches.some(pattern => {
+      const match = new URL(pattern);
+      const path = match.pathname.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*');
+      return match.origin === dom.window.location.origin && new RegExp(`^${path}$`).test(dom.window.location.pathname + dom.window.location.search);
+    });
+    if (!matches) continue;
+    for (const script of entry.js) dom.window.eval(script === 'content.js' ? source : readFileSync(script, 'utf8'));
+  }
   return {
     document, window: dom.window, errors, clicks,
     setPatterns: value => {
@@ -93,6 +102,23 @@ function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender 
 }
 
 for (const route of ['files', 'changes']) {
+  for (const entry of ['/', '/notifications', '/org/repo', '/org/repo/pulls', '/org/repo/issues/42']) {
+    test(`soft navigation from ${entry} mounts working tools on /${route} without a reload`, async t => {
+      const page = setup(t, '<main>GitHub entry page</main>', entry);
+      await delay(20);
+      assert.equal(page.document.querySelector('#viewed-state-toolbar'), null, 'Tools appeared outside a diff route');
+      page.window.history.pushState({}, '', `/org/repo/pull/42/${route}`);
+      page.document.querySelector('main').innerHTML = modernPage([false, false, false]);
+      page.document.dispatchEvent(new page.window.Event('turbo:load'));
+      await waitFor(() => page.control() && !page.control().disabled, 'Tools missing after soft navigation from a non-PR document');
+      page.control().click();
+      await waitFor(() => page.states().every(Boolean), 'Tools did not update files after soft navigation');
+      await waitFor(() => !page.control().disabled, 'Tools stayed busy');
+      assert.equal(page.document.querySelectorAll('#viewed-state-toolbar').length, 1);
+      assert.equal(page.errors.length, 0);
+    });
+  }
+
   test(`shows one control on the React /${route} page`, async (t) => {
     const page = setup(t, modernPage(), `/Hikyo-Org/Hikyo/pull/858/${route}`);
     await waitFor(() => page.control(), 'Mark All Files control missing on React page');
@@ -100,6 +126,26 @@ for (const route of ['files', 'changes']) {
     page.document.body.append(page.document.createElement('div'));
     await delay(50);
     assert.equal(page.document.querySelectorAll('#viewed-state-checkbox').length, 1);
+    assert.equal(page.errors.length, 0);
+  });
+}
+
+test('GitHub entry pages keep review markup untouched until a diff route opens', async t => {
+  const page = setup(t, modernPage(), '/notifications');
+  await waitFor(() => page.window.reviewFileSettings, 'Scripts did not load on the entry page');
+  await delay(20);
+  assert.equal(page.document.querySelector('#viewed-state-toolbar'), null);
+  assert.deepEqual(page.states(), [true, false, false]);
+  assert.equal(page.clicks.length, 0);
+  assert.equal(page.errors.length, 0);
+});
+
+for (const origin of ['https://example.com', 'https://github.com.example.com', 'https://gist.github.com', 'http://github.com']) {
+  test(`does not load GitHub content scripts on ${origin}`, async t => {
+    const page = setup(t, modernPage(), `${origin}/org/repo/pull/42/files`);
+    await delay(20);
+    assert.equal(page.window.reviewFileSettings, undefined);
+    assert.equal(page.control(), null);
     assert.equal(page.errors.length, 0);
   });
 }
