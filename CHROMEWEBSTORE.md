@@ -61,6 +61,8 @@ The 1.1.2 compatibility update supplies its own button styling and a floating fa
 
 ## Version history
 
+- 1.1.4 — 2026-10-20: Publishing verification release with a locked API v2 library, provider status reporting, duplicate-version checks, and read-only status mode. Extension runtime behavior is unchanged.
+
 - 1.1.3 — 2026-10-20: Show review tools when opening a pull request through in-place navigation from another GitHub page. Prepared for the main-branch publishing workflow; verify its result and the public listing for publication status.
 - 1.1.2 — 2026-10-19: Detect review progress using accessible text and ARIA metadata, preserve controls when the toolbar cannot be identified, and provide independent control styling. Prepared for submission; verify the release workflow and public listing for publication status.
 - 1.1.1 — 2026-10-09: Recognize filenames in GitHub's current untitled diff-header links and explain zero-target buttons. Publication status must be verified from the release workflow and store.
@@ -73,6 +75,8 @@ Only loaded files can be changed. Filters with active patterns leave files witho
 
 ## Publishing automation
 
-The main-branch workflow uses Chrome Web Store API v2 through `chrome-webstore-upload-cli@4.0.2` on Node.js 24. It retains the existing `CLIENT`, `SECRET`, and `TOKEN` repository secrets. The `CHROME_PUBLISHER_ID` repository variable must contain the publisher account ID from the Developer Dashboard, not the extension ID or display name. It is configured for this repository.
+The main-branch workflow uses Chrome Web Store API v2 through the locked `chrome-webstore-upload@6.0.1` library on Node.js 24. It retains the existing `CLIENT`, `SECRET`, and `TOKEN` repository secrets. The `CHROME_PUBLISHER_ID` repository variable must contain the publisher account ID from the Developer Dashboard, not the extension ID or display name. It is configured for this repository.
 
-The CLI runs without a subcommand to upload and submit for review with `DEFAULT_PUBLISH`; `upload` alone would leave a draft. Existing store visibility and rollout settings remain in effect. See the [migration handoff](docs/cws-api-v2.md) or its [offline HTML version](docs/cws-api-v2.html) for evidence and release checks.
+The tested `scripts/publish-cws.mjs` checks published/submitted versions, uploads, requests `DEFAULT_PUBLISH`, and fetches status again. `pnpm publish:cws --status` is read-only. The manually dispatched workflow defaults to status mode. Existing store visibility and rollout settings remain in effect. See the [migration handoff](docs/cws-api-v2.md) or its [offline HTML version](docs/cws-api-v2.html) for evidence and release checks.
+
+Documentation-only pushes no longer trigger publication. Live provider evidence and pending review are recorded separately in the migration handoff.
