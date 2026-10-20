@@ -1,5 +1,7 @@
 # Release 1.1.3 handoff
 
+Pull request: https://github.com/Dunky13/gh-review-mark-files-as/pull/6
+
 Date: 2026-10-20. Branch: `dunky13/fix-github-soft-navigation`. Base: `0c7a430`.
 
 Release candidate 1.1.3 fixes review tools missing after navigation from another GitHub page. The user authorized commit, push, PR, merge, and release. Local validation is complete; remote delivery must be verified against the PR head and resulting merge commit.
