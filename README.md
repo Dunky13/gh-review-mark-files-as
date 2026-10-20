@@ -4,6 +4,8 @@ Extension that adds a **Mark All Files** control to GitHub's pull request Files 
 
 Click to mark all files as viewed, click again to unmark them, and click again to restore the original selection if it was mixed. Individual Viewed changes keep the control in sync. The control survives GitHub's in-place navigation and toolbar rerenders.
 
+You can open GitHub on the dashboard, notifications, or a repository and click through to a pull request without refreshing. The content script starts on GitHub pages so it can follow in-place navigation; review tools appear only on pull request `/files` and `/changes` routes.
+
 Review tools use GitHub's accessible progress and control labels, with compatibility hooks for older layouts. If the toolbar cannot be identified, the tools appear in a floating panel at the bottom right. They return to the toolbar when it becomes available. The extension supplies its own control styling so GitHub button-class changes do not remove it.
 
 Only files whose Viewed controls are loaded on the page can be changed. When GitHub's progress count shows more files than are loaded, or the total cannot be determined, the control says **Mark Loaded Files**. Load the remaining files or leave the virtualized/single-file view to include them.
@@ -29,6 +31,8 @@ Each custom button shows its matching loaded-file count and cycles those files t
 3. Click **Load unpacked** and select this repository folder (the folder containing `manifest.json`).
 4. Refresh the GitHub pull request. **Mark All Files** should appear next to the viewed-file progress indicator.
 
+To check navigation, open a repository or notifications in a fresh tab, then click through to a pull request's **Files changed** tab. The review tools should appear without refreshing. Leaving Files changed removes the tools; returning restores them.
+
 After editing the extension, click **Reload** on its card and refresh the GitHub page. Loading this checkout does not update the published Web Store extension.
 
 ## Development
@@ -41,7 +45,7 @@ node --check content.js && node --check settings.js && node --check options.js &
 pnpm test
 ```
 
-Regression tests exercise the actual content script with classic and React DOM fixtures, including delayed rendering, tri-state restoration, navigation, and asynchronous button replacement. CI runs these checks before packaging and publishing.
+Regression tests load the actual scripts according to the manifest's URL matches and file order, then exercise classic and React DOM fixtures, including navigation from non-PR entry pages, delayed rendering, tri-state restoration, and asynchronous button replacement. CI runs these checks before packaging and publishing.
 
 # Donations
 If you like what I do, please consider donating to continue this development as https://www.buymeacoffee.com/developwent
