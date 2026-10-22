@@ -6,7 +6,7 @@ Click to mark all files as viewed, click again to unmark them, and click again t
 
 You can open GitHub on the dashboard, notifications, or a repository and click through to a pull request without refreshing. The content script starts on GitHub pages so it can follow in-place navigation; review tools appear only on pull request `/files` and `/changes` routes.
 
-Review tools use GitHub's accessible progress and control labels, with compatibility hooks for older layouts. If the toolbar cannot be identified, the tools appear in a floating panel at the bottom right. They return to the toolbar when it becomes available. The extension supplies its own control styling so GitHub button-class changes do not remove it.
+Review tools use GitHub's accessible progress and control labels, with compatibility hooks for older layouts. If the toolbar cannot be identified, the tools appear in a floating panel at the bottom right. In **Header** mode they return to the toolbar when it becomes available. Use the placement menu to choose **Floating**, then drag the grip to move the panel anywhere in the window (or focus the grip and use arrow keys). Hold **Shift** while dropping to dock into a highlighted page container, or choose **Dock in page…** and click a container. **Escape** cancels placement. Header and floating preferences persist in this browser; custom docking is remembered for the current pull request route and falls back to floating if GitHub removes that container. Choose **Header** to reset. Tools hide while a review modal is open so they cannot cover its actions. The extension supplies its own control styling so GitHub button-class changes do not remove it.
 
 Only files whose Viewed controls are loaded on the page can be changed. When GitHub's progress count shows more files than are loaded, or the total cannot be determined, the control says **Mark Loaded Files**. Load the remaining files or leave the virtualized/single-file view to include them.
 
@@ -41,7 +41,7 @@ Use Node.js 24 and pnpm 11:
 
 ```sh
 pnpm install --frozen-lockfile
-node --check content.js && node --check settings.js && node --check options.js && node --check background.js
+node --check placement.js && node --check content.js && node --check settings.js && node --check options.js && node --check background.js
 pnpm test
 ```
 

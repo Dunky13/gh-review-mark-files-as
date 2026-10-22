@@ -35,7 +35,7 @@ function classicPage(states = [true, false, false]) {
   return '<div class="pr-review-tools"><span class="js-review-count">1 / 3 viewed</span></div><div class="js-diff-progressive-container">' + states.map((checked, index) => `<div class="file" data-path="src/file-${index}.js"><input type="checkbox" id="viewed-${index}" class="js-reviewed-checkbox" ${checked ? 'checked' : ''}></div>`).join('') + '</div>';
 }
 
-function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender = false, iconOnly = false, patterns, storageError } = {}) {
+function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender = false, iconOnly = false, patterns, storageError, placementPreference } = {}) {
   const errors = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', (error) => errors.push(error));
@@ -74,7 +74,7 @@ function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender 
     storage: {
       local: { get: async () => {
         if (storageError) throw new Error(storageError);
-        return { filePatterns: storedPatterns };
+        return { filePatterns: storedPatterns, reviewToolbarPlacement: placementPreference };
       } },
       onChanged: { addListener: listener => listeners.push(listener) },
     },
@@ -538,4 +538,127 @@ test('ARIA progress metadata and labelled file headings survive changed tags and
   await waitFor(() => page.control().nextElementSibling.textContent === 'Mark Loaded Files', 'ARIA total was ignored');
   page.document.querySelector('[role="progressbar"]').setAttribute('aria-valuemax', '3');
   await waitFor(() => page.control().nextElementSibling.textContent === 'Mark All Files', 'ARIA progress updates were ignored');
+});
+
+function placement(page, mode) {
+  const select = page.document.querySelector('#viewed-state-placement');
+  select.value = mode;
+  select.dispatchEvent(new page.window.Event('change', { bubbles: true }));
+}
+
+test('floating mode stays chosen when GitHub replaces its header; Header resets it', async t => {
+  const page = setup(t, modernPage());
+  const saved = [];
+  page.window.chrome.storage.local.set = async value => saved.push(value);
+  await waitFor(() => page.control(), 'Tools missing');
+  placement(page, 'floating');
+  await waitFor(() => page.document.querySelector('#viewed-state-toolbar').parentElement === page.document.body, 'Floating tools not mounted in body');
+  page.document.querySelector('.d-flex').outerHTML = toolbar();
+  await delay(30);
+  assert.equal(page.document.querySelector('#viewed-state-toolbar').dataset.placement, 'floating');
+  assert.equal(saved.at(-1).reviewToolbarPlacement.mode, 'floating');
+  placement(page, 'header');
+  await waitFor(() => page.document.querySelector('.d-flex > #viewed-state-toolbar'), 'Header reset failed');
+});
+
+test('review dialogs hide tools and closing them restores the controls', async t => {
+  const page = setup(t, modernPage());
+  await waitFor(() => page.control(), 'Tools missing');
+  const tools = page.document.querySelector('#viewed-state-toolbar');
+  const modal = page.document.createElement('div');
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.innerHTML = '<button>Submit review</button>';
+  page.document.body.append(modal);
+  await waitFor(() => tools.hidden, 'Toolbar overlaps review dialog');
+  modal.hidden = true;
+  await waitFor(() => !tools.hidden, 'Toolbar did not return');
+  const dialog = page.document.createElement('dialog');
+  page.document.body.append(dialog);
+  dialog.setAttribute('open', '');
+  await waitFor(() => tools.hidden, 'Native dialog not detected');
+  dialog.removeAttribute('open');
+  await waitFor(() => !tools.hidden, 'Native dialog close not detected');
+});
+
+test('keyboard movement clamps to viewport and reports persistence failure', async t => {
+  const page = setup(t, modernPage());
+  page.window.chrome.storage.local.set = async () => { throw new Error('disk full'); };
+  await waitFor(() => page.control(), 'Tools missing');
+  const handle = page.document.querySelector('#viewed-state-drag');
+  handle.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+  const tools = page.document.querySelector('#viewed-state-toolbar');
+  assert.equal(tools.style.left, '8px');
+  assert.equal(tools.parentElement, page.document.body);
+  await waitFor(() => page.document.querySelector('#viewed-state-placement-status').textContent.includes('disk full'), 'Save error not visible');
+});
+
+test('chosen page container survives replacement and falls back if removed', async t => {
+  const page = setup(t, modernPage() + '<aside id="custom-place"><p>Dock here</p></aside>');
+  const saved = [];
+  page.window.chrome.storage.local.set = async value => saved.push(value);
+  await waitFor(() => page.control(), 'Tools missing');
+  placement(page, 'custom');
+  page.document.querySelector('#custom-place p').click();
+  await waitFor(() => page.document.querySelector('#custom-place > #viewed-state-toolbar'), 'Custom dock failed');
+  assert.equal(saved.at(-1).reviewToolbarPlacement.mode, 'custom');
+  page.document.querySelector('#custom-place').outerHTML = '<aside id="custom-place"><p>Replacement</p></aside>';
+  await waitFor(() => page.document.querySelector('#custom-place > #viewed-state-toolbar'), 'Custom dock did not recover from replacement');
+  page.document.querySelector('#custom-place').remove();
+  await waitFor(() => page.document.querySelector('#viewed-state-toolbar')?.dataset.placement === 'floating', 'Missing custom dock did not fall back');
+});
+
+test('Escape cancels docking without consuming subsequent page clicks', async t => {
+  const page = setup(t, modernPage() + '<aside><button id="native-action">Action</button></aside>');
+  await waitFor(() => page.control(), 'Tools missing');
+  placement(page, 'custom');
+  page.document.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  let clicked = false;
+  page.document.querySelector('#native-action').addEventListener('click', () => { clicked = true; });
+  page.document.querySelector('#native-action').click();
+  assert.equal(clicked, true);
+  await delay(20);
+  assert.equal(page.document.querySelector('#viewed-state-placement').value, 'header');
+});
+
+test('saved floating placement restores after reload without changing button settings', async t => {
+  const page = setup(t, modernPage(), undefined, { placementPreference: { mode: 'floating', x: 140, y: 160 } });
+  await waitFor(() => page.control(), 'Tools missing');
+  const tools = page.document.querySelector('#viewed-state-toolbar');
+  assert.equal(tools.parentElement, page.document.body);
+  assert.equal(tools.style.left, '140px');
+  assert.equal(tools.style.top, '160px');
+  assert.equal(page.document.querySelector('#viewed-state-label').textContent, 'Mark All Files');
+});
+
+test('drag captures after reparenting, Shift drop docks, and cancellation restores preference', async t => {
+  const page = setup(t, modernPage() + '<aside id="custom-place"><p>Dock here</p></aside>');
+  page.window.chrome.storage.local.set = async () => {};
+  await waitFor(() => page.control(), 'Tools missing');
+  const tools = page.document.querySelector('#viewed-state-toolbar');
+  const handle = page.document.querySelector('#viewed-state-drag');
+  handle.setPointerCapture = () => assert.equal(tools.parentElement, page.document.body, 'Capture must follow reparenting');
+  page.document.elementsFromPoint = () => [page.document.querySelector('#custom-place p')];
+  const pointer = (name, options = {}) => {
+    const event = new page.window.MouseEvent(name, { bubbles: true, clientX: 100, clientY: 100, ...options });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    handle.dispatchEvent(event);
+  };
+  pointer('pointerdown');
+  pointer('pointermove', { clientX: 250, clientY: 200, shiftKey: true });
+  assert.ok(page.document.querySelector('#custom-place').hasAttribute('data-review-dock-target'));
+  pointer('pointerup', { shiftKey: true });
+  await waitFor(() => tools.parentElement.id === 'custom-place', 'Shift drop failed');
+  pointer('pointerdown');
+  pointer('pointermove', { clientX: 400 });
+  pointer('pointercancel');
+  page.document.dispatchEvent(new page.window.Event('change'));
+  await waitFor(() => tools.parentElement.id === 'custom-place', 'Cancelled drag did not restore docking');
+  assert.equal(page.document.querySelector('[data-review-dock-target]'), null);
+});
+
+test('Review changes header anchors tools even without a visible progress count', async t => {
+  const page = setup(t, '<div id="review-actions"><button>Review changes</button></div>' + modernPage().replace(toolbar(), ''));
+  await waitFor(() => page.control(), 'Tools missing');
+  assert.equal(page.document.querySelector('#viewed-state-toolbar').parentElement.id, 'review-actions');
 });
