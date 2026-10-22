@@ -35,7 +35,7 @@ function classicPage(states = [true, false, false]) {
   return '<div class="pr-review-tools"><span class="js-review-count">1 / 3 viewed</span></div><div class="js-diff-progressive-container">' + states.map((checked, index) => `<div class="file" data-path="src/file-${index}.js"><input type="checkbox" id="viewed-${index}" class="js-reviewed-checkbox" ${checked ? 'checked' : ''}></div>`).join('') + '</div>';
 }
 
-function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender = false, iconOnly = false, patterns, storageError, placementPreference } = {}) {
+function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender = false, iconOnly = false, patterns, storageError, placementPreference, placementLoadDelay = 0 } = {}) {
   const errors = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', (error) => errors.push(error));
@@ -72,8 +72,9 @@ function setup(t, html, route = '/Hikyo-Org/Hikyo/pull/858/changes', { rerender 
   dom.window.chrome = {
     runtime: { sendMessage: async () => ({ opened: true }) },
     storage: {
-      local: { get: async () => {
+      local: { get: async key => {
         if (storageError) throw new Error(storageError);
+        if (key === 'reviewToolbarPlacement' && placementLoadDelay) await delay(placementLoadDelay);
         return { filePatterns: storedPatterns, reviewToolbarPlacement: placementPreference };
       } },
       onChanged: { addListener: listener => listeners.push(listener) },
@@ -661,4 +662,80 @@ test('Review changes header anchors tools even without a visible progress count'
   const page = setup(t, '<div id="review-actions"><button>Review changes</button></div>' + modernPage().replace(toolbar(), ''));
   await waitFor(() => page.control(), 'Tools missing');
   assert.equal(page.document.querySelector('#viewed-state-toolbar').parentElement.id, 'review-actions');
+});
+
+test('docking confirmation clears after five seconds without moving the toolbar', async t => {
+  const page = setup(t, modernPage() + '<aside id="custom-place"><p>Dock here</p></aside>');
+  page.window.chrome.storage.local.set = async () => {};
+  await waitFor(() => page.control(), 'Tools missing');
+  placement(page, 'custom');
+  page.document.querySelector('#custom-place p').click();
+  const status = page.document.querySelector('#viewed-state-placement-status');
+  assert.equal(status.textContent, 'Toolbar docked. Choose Header to reset.');
+  await delay(5200);
+  assert.equal(status.textContent, '');
+  assert.equal(page.document.querySelector('#viewed-state-toolbar').parentElement.id, 'custom-place');
+});
+
+test('new docking instructions and save errors survive an older confirmation timer', async t => {
+  const page = setup(t, modernPage() + '<aside id="custom-place"><p>Dock here</p></aside>');
+  page.window.chrome.storage.local.set = async () => {};
+  await waitFor(() => page.control(), 'Tools missing');
+  placement(page, 'custom');
+  page.document.querySelector('#custom-place p').click();
+  placement(page, 'custom');
+  const status = page.document.querySelector('#viewed-state-placement-status');
+  await delay(5200);
+  assert.equal(status.textContent, 'Select a page container to dock here. Press Escape to cancel.');
+  placement(page, 'header');
+  await waitFor(() => page.document.querySelector('.d-flex > #viewed-state-toolbar'), 'Header reset failed');
+  page.window.chrome.storage.local.set = async () => { throw new Error('disk full'); };
+  placement(page, 'custom');
+  page.document.querySelector('#custom-place p').click();
+  await waitFor(() => status.textContent.includes('disk full'), 'Save error missing');
+  await delay(5200);
+  assert.match(status.textContent, /disk full/);
+});
+
+test('custom placement saved by docking restores on a fresh page', async t => {
+  const html = modernPage() + '<aside id="custom-place"><p>Dock here</p></aside>';
+  const page = setup(t, html);
+  let saved;
+  page.window.chrome.storage.local.set = async value => { saved = value.reviewToolbarPlacement; };
+  await waitFor(() => page.control(), 'Tools missing');
+  placement(page, 'custom');
+  page.document.querySelector('#custom-place p').click();
+  await waitFor(() => saved, 'Placement not saved');
+  const restored = setup(t, html, undefined, { placementPreference: saved });
+  await waitFor(() => restored.document.querySelector('#custom-place > #viewed-state-toolbar'), 'Saved custom placement not restored');
+  assert.equal(restored.document.querySelector('#viewed-state-placement-status').textContent, '');
+});
+
+test('docking inside the header restores without counting the injected toolbar as page structure', async t => {
+  const html = '<header id="review-header"><span>0 / 3 viewed</span><button>Submit review</button><div><p>Dock here</p></div></header>'
+    + modernFile('src/file.js', 0, false);
+  const page = setup(t, html);
+  let saved;
+  page.window.chrome.storage.local.set = async value => { saved = value.reviewToolbarPlacement; };
+  await waitFor(() => page.control(), 'Tools missing');
+  placement(page, 'custom');
+  page.document.querySelector('#review-header > div > p').click();
+  await waitFor(() => saved, 'Placement not saved');
+  const restored = setup(t, html, undefined, { placementPreference: saved, placementLoadDelay: 50 });
+  await waitFor(() => restored.document.querySelector('#review-header > div > #viewed-state-toolbar'), 'Saved location points to the injected toolbar instead of its dock container');
+});
+
+test('saved custom dock follows other PRs and restores after a missing container returns', async t => {
+  const html = modernPage() + '<aside id="custom-place"><p>Dock here</p></aside>';
+  const page = setup(t, html, '/other/repo/pull/42/files', {
+    placementPreference: { mode: 'custom', selector: '#custom-place', path: '/Hikyo-Org/Hikyo/pull/858/changes' },
+  });
+  await waitFor(() => page.document.querySelector('#custom-place > #viewed-state-toolbar'), 'Dock was restricted to its original PR route');
+  page.document.querySelector('#custom-place').remove();
+  await waitFor(() => page.document.querySelector('#viewed-state-toolbar')?.dataset.placement === 'floating', 'Missing container did not fall back');
+  page.window.history.pushState({}, '', '/another/repo/pull/99/changes');
+  const container = page.document.createElement('aside');
+  container.id = 'custom-place';
+  page.document.body.append(container);
+  await waitFor(() => container.querySelector('#viewed-state-toolbar'), 'Dock did not return on another PR');
 });
