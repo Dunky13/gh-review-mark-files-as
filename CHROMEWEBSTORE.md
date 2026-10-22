@@ -20,7 +20,7 @@ Works on both Files changed layouts. Only files loaded on the page can be change
 
 Review tools also appear when you click through from GitHub notifications, the dashboard, or a repository to a pull request, without refreshing the page.
 
-Keep review tools in the header, drag them freely around the window, or dock them in a chosen page container. Placement is saved locally. Review tools hide while a review dialog is open. If GitHub changes a saved container, controls remain available in a floating panel.
+Keep review tools in the header, drag them freely around the window, or dock them in a chosen page container. Placement is saved locally and reused across pull requests. Docking confirmations disappear automatically. Review tools hide while a review dialog is open. If GitHub changes a saved container, controls remain available in a floating panel.
 
 Support: https://github.com/Dunky13/gh-review-mark-files-as/issues
 
@@ -60,6 +60,8 @@ Icons remain unchanged (`images/icon.128.png` is the store icon). Existing publi
 The 1.1.2 compatibility update supplies its own button styling and a floating fallback panel. Refresh toolbar screenshots and include the fallback panel before updating the listing assets.
 
 ## Version history
+
+- 1.2.1 — 2026-10-22: Clear docking confirmations after five seconds and remember custom docking across pull requests. Preserve instructions and save errors. Verified in Chrome with the unpacked extension; publication status must be verified separately.
 
 - 1.2.0 — 2026-10-22: Choose header placement, freely move the toolbar with a drag handle or arrow keys, and dock it in a page container. Save placement locally and hide tools during review dialogs. Prepared for automated publication; verify workflow and store status separately.
 

@@ -7,20 +7,29 @@
   let picking = false;
   let drag = null;
   let sizeObserver = null;
+  let reportTimer = null;
   const containerSelector = 'header, nav, aside, main, footer, section, div, [role="toolbar"]';
 
   function normalize(value) {
     if (value?.mode === 'floating' && Number.isFinite(value.x) && Number.isFinite(value.y)) {
       return { mode: 'floating', x: value.x, y: value.y };
     }
-    if (value?.mode === 'custom' && typeof value.selector === 'string' && value.selector.length < 2000
-      && typeof value.path === 'string') return value;
+    if (value?.mode === 'custom' && typeof value.selector === 'string' && value.selector.length < 2000) {
+      return { mode: 'custom', selector: value.selector };
+    }
     return { mode: 'header' };
   }
 
-  function report(message) {
+  function report(message, temporary = false) {
+    clearTimeout(reportTimer);
+    reportTimer = null;
     const status = active?.querySelector('#viewed-state-placement-status');
-    if (status) status.textContent = message;
+    if (!status) return;
+    status.textContent = message;
+    if (temporary) reportTimer = setTimeout(() => {
+      status.textContent = '';
+      reportTimer = null;
+    }, 5000);
   }
 
   async function save() {
@@ -71,10 +80,10 @@
   function dock() {
     if (!dockTarget) return false;
     dockTarget.prepend(active);
-    preference = { mode: 'custom', selector: selectorFor(dockTarget), path: location.pathname };
+    preference = { mode: 'custom', selector: selectorFor(dockTarget) };
     clearTarget();
     picking = false;
-    report('Toolbar docked. Choose Header to reset.');
+    report('Toolbar docked. Choose Header to reset.', true);
     void save();
     return true;
   }
@@ -199,7 +208,7 @@
     picking = false;
     clearTarget();
     if (active) delete active.dataset.dragging;
-    report('Placement cancelled.');
+    report('Placement cancelled.', true);
   }, true);
   window.addEventListener('resize', () => {
     if (preference.mode === 'floating' && active?.isConnected) move(preference.x, preference.y);
@@ -208,6 +217,7 @@
   globalThis.reviewToolbarPlacement = {
     mount(toolbar, header) {
       if (active !== toolbar) {
+        report('');
         clearTarget();
         picking = false;
         drag = null;
@@ -215,7 +225,7 @@
         initialize(toolbar);
       }
       let target = preference.mode === 'header' ? header : null;
-      if (preference.mode === 'custom' && preference.path === location.pathname) {
+      if (preference.mode === 'custom') {
         try { target = document.querySelector(preference.selector); } catch { target = null; }
         if (target === toolbar || toolbar.contains(target)) target = null;
       }
