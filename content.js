@@ -122,7 +122,8 @@
 
   function getHeader(progress) {
     const review = Array.from(document.querySelectorAll('button, [role="button"]')).find(button =>
-      !isFileContent(button) && /^(?:submit|finish)\s+review\b/i.test((button.getAttribute('aria-label') || button.textContent).trim()));
+      !isFileContent(button) && !button.closest('dialog, [role="dialog"]')
+      && /^(?:(?:submit|finish)\s+(?:your\s+)?review|review\s+changes)\b/i.test((button.getAttribute('aria-label') || button.textContent).trim()));
     if (progress && review) {
       // Mount alongside both controls, never inside the progress-only wrapper
       // that GitHub hides on narrow screens. Do not climb into the file list.
@@ -131,8 +132,9 @@
         if (parent.contains(review)) return parent;
       }
     }
-    const toolbar = review?.closest('[role="toolbar"]');
-    if (toolbar && !toolbar.querySelector(viewedSelector)) return toolbar;
+    const toolbar = review?.closest('[role="toolbar"], header') || review?.parentElement;
+    if (toolbar && toolbar !== document.body && !toolbar.querySelector(viewedSelector)
+      && !toolbar.closest('dialog, [role="dialog"], form')) return toolbar;
     return Array.from(document.querySelectorAll('.pr-review-tools')).find(element => !isFileContent(element))
       || Array.from(document.querySelectorAll('[class*="ViewedFileProgress"]')).find(element => !isFileContent(element))?.closest('.d-flex');
   }
@@ -148,6 +150,12 @@
       style.textContent = `
         #viewed-state-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; max-width:100%; box-sizing:border-box; font:12px/1.4 system-ui,sans-serif; color:var(--fgColor-default,CanvasText); }
         #viewed-state-toolbar[data-placement="floating"] { position:fixed; inset:auto 16px 16px auto; z-index:2147483646; max-width:calc(100vw - 32px); max-height:40vh; overflow:auto; padding:10px; border:1px solid var(--borderColor-default,GrayText); border-radius:8px; background:var(--bgColor-default,Canvas); box-shadow:0 4px 16px #0003; }
+        #viewed-state-toolbar[hidden] { display:none; }
+        #viewed-state-drag, #viewed-state-placement { border:1px solid var(--borderColor-default,GrayText); border-radius:6px; padding:5px; font:inherit; color:inherit; background:var(--bgColor-muted,ButtonFace); }
+        #viewed-state-drag { cursor:grab; touch-action:none; -webkit-user-select:none; user-select:none; font-size:18px; line-height:1; }
+        #viewed-state-toolbar[data-dragging] #viewed-state-drag { cursor:grabbing; }
+        #viewed-state-placement-status:not(:empty) { flex-basis:100%; }
+        [data-review-dock-target] { outline:2px dashed var(--focus-outlineColor,Highlight) !important; outline-offset:-2px; }
         #viewed-state-controls { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
         #viewed-state-controls label, #viewed-state-settings { display:inline-flex; align-items:center; gap:6px; box-sizing:border-box; max-width:100%; margin:0; padding:5px 9px; border:1px solid var(--borderColor-default,GrayText); border-radius:6px; font:inherit; font-weight:600; cursor:pointer; }
         #viewed-state-controls label { background:var(--button-primary-bgColor-rest,#1f883d); color:var(--button-primary-fgColor-rest,#fff); }
@@ -159,10 +167,7 @@
       `;
       toolbar.append(style);
     }
-    const placement = header ? 'inline' : 'floating';
-    if (toolbar.dataset.placement !== placement) toolbar.dataset.placement = placement;
-    const target = header || document.body;
-    if (toolbar.parentElement !== target) header ? target.prepend(toolbar) : target.append(toolbar);
+    reviewToolbarPlacement.mount(toolbar, header);
     return toolbar;
   }
 
@@ -366,7 +371,7 @@
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ['aria-pressed', 'aria-label', 'aria-valuemax', 'checked', 'class', 'disabled'],
+    attributeFilter: ['aria-pressed', 'aria-label', 'aria-valuemax', 'checked', 'class', 'disabled', 'open', 'hidden', 'aria-hidden', 'aria-modal'],
   });
   document.addEventListener('change', scheduleSynchronize);
   document.addEventListener('click', scheduleSynchronize);

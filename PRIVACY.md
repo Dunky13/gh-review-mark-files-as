@@ -1,8 +1,8 @@
 # Privacy policy
 
-Last updated: 2026-10-08
+Last updated: 2026-10-22
 
-GitHub Pull Request Mark All Files as saves your review button names and file patterns locally in your browser. It reads loaded pull request file paths and viewed states to identify matching files, and retains the initial viewed selection in memory while you use that page.
+GitHub Pull Request Mark All Files as saves your review button names, file patterns, and toolbar placement preferences locally in your browser. It reads loaded pull request file paths and viewed states to identify matching files, and retains the initial viewed selection in memory while you use that page.
 
 The extension does not send settings, file paths, repository contents, credentials, analytics, or telemetry to the developer or third parties. Clicking a review button operates GitHub's normal Viewed controls, so GitHub handles those viewed-state updates under its own policies.
 

@@ -1,6 +1,6 @@
 # Chrome Web Store listing
 
-Last updated: 2026-10-20
+Last updated: 2026-10-22
 
 ## Store listing
 
@@ -20,7 +20,7 @@ Works on both Files changed layouts. Only files loaded on the page can be change
 
 Review tools also appear when you click through from GitHub notifications, the dashboard, or a repository to a pull request, without refreshing the page.
 
-If GitHub's toolbar changes, review controls remain available in a floating panel and return to the toolbar when it is recognized again.
+Keep review tools in the header, drag them freely around the window, or dock them in a chosen page container. Placement is saved locally. Review tools hide while a review dialog is open. If GitHub changes a saved container, controls remain available in a floating panel.
 
 Support: https://github.com/Dunky13/gh-review-mark-files-as/issues
 
@@ -32,12 +32,12 @@ Language: English
 
 ## Permissions justification
 
-- `storage`: Save review button names and include/exclude patterns locally so users do not need to reconfigure them on each pull request.
+- `storage`: Save review button names, include/exclude patterns, and toolbar placement locally so users do not need to reconfigure them on each pull request.
 - `https://github.com/**`: Read loaded file paths and Viewed controls on GitHub pull requests and operate those controls when the user selects a review button. Content scripts start on GitHub pages so they can follow in-place navigation from the dashboard, notifications, and repositories. Review tools and file-state processing are limited to pull request `/files` and `/changes` routes.
 
 ## Privacy and data use
 
-Saved data consists of button IDs, names, and include/exclude patterns in this browser. Pull request file paths and current viewed states are read transiently to select matching controls. The extension does not upload these settings or send telemetry, analytics, credentials, or repository contents to the developer or third parties. Viewed-state changes use GitHub's own controls and are handled by GitHub.
+Saved data consists of button IDs, names, include/exclude patterns, and toolbar placement preferences in this browser. Pull request file paths and current viewed states are read transiently to select matching controls. The extension does not upload these settings or send telemetry, analytics, credentials, or repository contents to the developer or third parties. Viewed-state changes use GitHub's own controls and are handled by GitHub.
 
 Data is not sold, used for unrelated purposes, or used for creditworthiness or lending. The extension has no remote executable code or external analytics dependency.
 
@@ -60,6 +60,8 @@ Icons remain unchanged (`images/icon.128.png` is the store icon). Existing publi
 The 1.1.2 compatibility update supplies its own button styling and a floating fallback panel. Refresh toolbar screenshots and include the fallback panel before updating the listing assets.
 
 ## Version history
+
+- 1.2.0 — 2026-10-22: Choose header placement, freely move the toolbar with a drag handle or arrow keys, and dock it in a page container. Save placement locally and hide tools during review dialogs. Prepared for automated publication; verify workflow and store status separately.
 
 - 1.1.4 — 2026-10-20: Publishing verification release with a locked API v2 library, provider status reporting, duplicate-version checks, and read-only status mode. Extension runtime behavior is unchanged.
 
