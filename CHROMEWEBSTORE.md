@@ -83,7 +83,7 @@ Only loaded files can be changed. Filters with active patterns leave files witho
 
 ## Publishing automation
 
-The main-branch workflow uses Chrome Web Store API v2 through the locked `chrome-webstore-upload@6.0.1` library on Node.js 24. It retains the existing `CLIENT`, `SECRET`, and `TOKEN` repository secrets. The `CHROME_PUBLISHER_ID` repository variable must contain the publisher account ID from the Developer Dashboard, not the extension ID or display name. It is configured for this repository.
+The main-branch workflow uses Chrome Web Store API v2 through the locked `chrome-webstore-upload@6.0.1` library on Node.js 26.12.1. It retains the existing `CLIENT`, `SECRET`, and `TOKEN` repository secrets. The `CHROME_PUBLISHER_ID` repository variable must contain the publisher account ID from the Developer Dashboard, not the extension ID or display name. It is configured for this repository.
 
 The tested `scripts/publish-cws.mjs` checks published/submitted versions, uploads, requests `DEFAULT_PUBLISH`, and fetches status again. `pnpm publish:cws --status` is read-only. The manually dispatched workflow defaults to status mode. Existing store visibility and rollout settings remain in effect. See the [migration handoff](docs/cws-api-v2.md) or its [offline HTML version](docs/cws-api-v2.html) for evidence and release checks.
 

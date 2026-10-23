@@ -41,7 +41,7 @@ After editing the extension, click **Reload** on its card and refresh the GitHub
 
 ## Development
 
-Use Node.js 24 and pnpm 11:
+Use Node.js 26.12.1 and pnpm 11:
 
 ```sh
 pnpm install --frozen-lockfile
