@@ -20,6 +20,10 @@ Open **Settings** beside the review buttons, click the extension icon, or open t
 
 Add, rename, or remove up to 20 buttons, then **Save** to update open pull requests immediately. Removing every button leaves only Settings in the toolbar. **Reset** saves the default configuration.
 
+To check deletions and unchanged moves together, add a button named **Deletes and moves**, set **File changes** to **Delete-only and move-only**, leave Include and Exclude blank, and **Save**. You can also select **Delete-only** or **Move-only** separately. Delete-only includes deleted files and edits that remove lines without adding any. Move-only includes renames and moves with no content changes; renames with edits are excluded. Existing buttons use **All changes**.
+
+Change filters and path patterns both apply when configured. The extension reads GitHub's file summaries and status messages, so collapsed or partially loaded diff lines cannot be mistaken for complete change counts. Files with unknown change types stay untouched. When path patterns are active, ambiguous rename paths also stay untouched.
+
 Patterns are relative to the repository root. `*` matches within a path segment, `**` crosses folders, and `?` matches one character. `**/` also matches zero folders, so root-level tests are included. Patterns are case-sensitive; other characters are literal. A file must match any include pattern (unless the include field is blank) and must not match any exclude pattern.
 
 Each custom button shows its matching loaded-file count and cycles those files through viewed, unviewed, and their original selection when mixed. Nonmatching files keep their state. Overlapping buttons stay in sync; only one batch runs at a time. Settings changed during a batch apply to subsequent clicks. Files without an identifiable path are left untouched when filtering is active. Settings persist locally in this browser and apply across repositories.

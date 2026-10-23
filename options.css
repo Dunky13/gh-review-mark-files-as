@@ -7,12 +7,15 @@ label, legend { font-weight: 600; }
 button { font: inherit; min-height: 34px; padding: 5px 12px; border: 1px solid light-dark(#818b98, #59636e); border-radius: 5px; cursor: pointer; }
 button[type=submit] { background: #1a7f37; color: white; border-color: #1a7f37; }
 :focus-visible { outline: 3px solid #0969da; outline-offset: 2px; }
-input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 34px; font: inherit; padding: 6px 8px; border: 1px solid light-dark(#818b98, #59636e); border-radius: 5px; color: inherit; background: light-dark(#fff, #151b23); }
+input, select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 34px; font: inherit; padding: 6px 8px; border: 1px solid light-dark(#818b98, #59636e); border-radius: 5px; color: inherit; background: light-dark(#fff, #151b23); }
 .button-settings { padding: 12px; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 6px; margin-bottom: 12px; background: light-dark(#fff, #151b23); }
 .button-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 12px; }
 .remove { border-color: transparent; background: transparent; color: light-dark(#59636e, #9198a1); }
 .remove:hover { color: light-dark(#cf222e, #ff7b72); }
 .pattern-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.change-filter { margin-bottom: 14px; }
+.change-filter label { display: block; margin-bottom: 6px; }
+.change-filter p { margin: 6px 0 0; font-size: 12px; color: light-dark(#59636e, #9198a1); }
 .pattern-group legend { padding: 0; margin-bottom: 6px; }
 .hint { font-weight: 400; font-size: 12px; color: light-dark(#59636e, #9198a1); margin-left: 8px; }
 .pattern-row { display: grid; grid-template-columns: minmax(0, 1fr) 32px 32px; gap: 4px; margin-bottom: 6px; }
@@ -35,6 +38,6 @@ details p { text-align: left; margin: 8px 0; }
   details { text-align: left; }
 }
 @media (pointer: coarse) {
-  input, button { min-height: 48px; }
+  input, select, button { min-height: 48px; }
   .pattern-row { grid-template-columns: minmax(0, 1fr) 48px 48px; }
 }

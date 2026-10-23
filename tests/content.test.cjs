@@ -739,3 +739,95 @@ test('saved custom dock follows other PRs and restores after a missing container
   page.document.body.append(container);
   await waitFor(() => container.querySelector('#viewed-state-toolbar'), 'Dock did not return on another PR');
 });
+
+// Header summaries match GitHub's classic renderer. React status markup is
+// derived from DiffFileHeader / PlainTextStatus in the GitHub assets above.
+function changeFile(index, { classic = false, name = `src/file-${index}.js`, added = 0, deleted = 3,
+  removed = false, moved = false, checked = false, unknown = false, binary = false, collapsed = false } = {}) {
+  const summary = unknown ? '' : `<span class="sr-only">${added + deleted} lines changed: ${added} additions &amp; ${deleted} deletions</span>`;
+  const status = moved && !collapsed ? `<div data-diff-anchor="diff-${index}" class="diff-empty">File renamed without changes.</div>` : '';
+  const rename = moved ? '<span class="sr-only">old.js renamed to new.js </span>' : '';
+  if (classic) {
+    return `<div class="file" id="diff-${index}"><div class="file-header" data-path="${name}" data-file-deleted="${removed}">${summary}<a href="#diff-${index}" title="${name}">${name}${rename}</a><input type="checkbox" class="js-reviewed-checkbox" ${checked ? 'checked' : ''}></div>${status}</div>`;
+  }
+  return currentGitHubFile(name, index, checked).replace('</code>', `${rename}</code>`)
+    .replace('<button class="MarkAsViewedButton', `${summary}${binary ? '<code>+100 Bytes</code>' : ''}<button class="MarkAsViewedButton`)
+    .replace('</section>', `${status}</section>`);
+}
+
+for (const classic of [true, false]) {
+  for (const route of ['files', 'changes']) {
+    test(`delete and move filter marks only eligible ${classic ? 'classic' : 'React'} files on /${route}`, async t => {
+      const files = [
+        { added: 0, deleted: 5, removed: true },
+        { added: 0, deleted: 2 }, // A deletion-only edit also qualifies.
+        { added: 0, deleted: 0, moved: true, checked: true },
+        { added: 2, deleted: 2, moved: true }, // A rename with edits must stay open.
+        { added: 4, deleted: 0 },
+        { unknown: true },
+      ];
+      const page = setup(t, toolbar() + files.map((file, index) => changeFile(index, { ...file, classic })).join(''), `/org/repo/pull/42/${route}`, {
+        rerender: !classic, patterns: { include: '', exclude: '', changeType: 'delete-or-move' },
+      });
+      await waitFor(() => page.control(), 'Filtered control missing');
+      assert.equal(page.control().nextElementSibling.textContent, 'Mark Matching Files (3)');
+      for (const expected of [[true, true, true, false, false, false], [false, false, false, false, false, false], [false, false, true, false, false, false]]) {
+        page.control().click();
+        await waitFor(() => JSON.stringify(page.states()) === JSON.stringify(expected), 'Change filter touched an ineligible file or failed to restore');
+        await waitFor(() => !page.control().disabled, 'Filtered batch stayed busy');
+      }
+      assert.equal(page.errors.length, 0);
+    });
+  }
+}
+
+test('change filters combine with patterns, update live, and synchronize overlapping buttons', async t => {
+  const files = [
+    { name: 'src/remove.js' }, { name: 'vendor/remove.js' },
+    { name: 'src/move.js', moved: true, added: 0, deleted: 0 },
+    { name: 'src/edit.js', added: 1 },
+  ];
+  const button = { id: 'deletes', name: 'Deletes', include: 'src/**', exclude: 'vendor/**', changeType: 'delete-only' };
+  const page = setup(t, toolbar() + files.map((file, index) => changeFile(index, file)).join(''), undefined, { patterns: { buttons: [
+    { id: 'all', name: 'All Files', include: '', exclude: '' }, button,
+  ] } });
+  const control = () => page.document.querySelector('#viewed-state-checkbox-deletes');
+  await waitFor(() => control(), 'Delete button missing');
+  assert.equal(control().nextElementSibling.textContent, 'Mark Deletes (1)');
+  control().click();
+  await waitFor(() => page.states()[0] && !control().disabled, 'Deletion not marked');
+  assert.deepEqual(page.states(), [true, false, false, false]);
+  assert.equal(page.control().indeterminate, true);
+  page.setPatterns({ buttons: [{ ...button, name: 'Moves', include: '', exclude: '', changeType: 'move-only' }] });
+  await waitFor(() => page.control()?.nextElementSibling.textContent === 'Mark Moves (1)', 'Move filter did not update live');
+  page.control().click();
+  await waitFor(() => page.states()[2], 'Move was not marked');
+  assert.deepEqual(page.states(), [true, false, true, false]);
+});
+
+test('missing summaries and source/comment text cannot impersonate change metadata', async t => {
+  const page = setup(t, toolbar()
+    + changeFile(0, { unknown: true })
+    + changeFile(1, { added: 0, deleted: 0 })
+    + changeFile(2, { added: 2, deleted: 0 })
+    + changeFile(3, { unknown: true }), undefined, { patterns: { include: '', exclude: '', changeType: 'delete-or-move' } });
+  page.document.querySelector('#diff-0').insertAdjacentHTML('beforeend', '<pre><code><div data-diff-anchor="diff-0">File renamed without changes.</div><span class="sr-only">3 changes: 0 additions &amp; 3 deletions</span></code></pre>');
+  page.document.querySelector('#diff-1').insertAdjacentHTML('beforeend', '<div class="comment-body"><div data-diff-anchor="diff-1">File renamed without changes.</div></div>');
+  page.document.querySelector('#diff-3 [data-diff-header-wrapper]').insertAdjacentHTML('beforeend', '<h3><a href="#diff-3" aria-label="3 changes: 0 additions &amp; 3 deletions">filename</a></h3>');
+  await waitFor(() => page.control(), 'Control missing');
+  assert.equal(page.control().disabled, true);
+  assert.match(page.control().title, /unknown change types/);
+  assert.equal(page.control().nextElementSibling.textContent, 'Mark Matching Files (0)');
+});
+
+test('collapsed zero-change renames qualify while binary size changes and unknown renames do not', async t => {
+  const page = setup(t, toolbar()
+    + changeFile(0, { moved: true, added: 0, deleted: 0, collapsed: true })
+    + changeFile(1, { moved: true, added: 0, deleted: 0, collapsed: true, binary: true })
+    + changeFile(2, { moved: true, unknown: true, collapsed: true }), undefined, { patterns: { include: '', exclude: '', changeType: 'move-only' } });
+  await waitFor(() => page.control(), 'Move button missing');
+  assert.equal(page.control().nextElementSibling.textContent, 'Mark Matching Files (1)');
+  page.control().click();
+  await waitFor(() => page.states()[0], 'Collapsed rename was missed');
+  assert.deepEqual(page.states(), [true, false, false]);
+});

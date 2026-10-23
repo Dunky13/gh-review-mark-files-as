@@ -65,9 +65,48 @@
     return diff?.getAttribute('aria-label') || '';
   }
 
+  function fileChangeType(file) {
+    const diff = file.closest('.file') || file.closest(fileRegionSelector);
+    if (!diff) return '';
+    const header = diff.matches('.file-header') ? diff
+      : diff.querySelector('[data-diff-header-wrapper], .file-header');
+    if (!header) return '';
+    // Read GitHub's summary, never infer totals from a partial/hidden diff.
+    let counts = null;
+    for (const element of header.querySelectorAll('.sr-only, [aria-label], .diffstat[title]')) {
+      if (element.closest('h3, a, button, code, details-menu')) continue;
+      const text = (element.getAttribute('aria-label') || element.getAttribute('title') || element.textContent).trim();
+      const match = text.match(/^(?:[\d,]+ (?:lines? )?change(?:s|d):?\s*)?([\d,]+) additions?\s*(?:&|and|,)\s*([\d,]+) deletions?\.?$/i);
+      if (match) {
+        counts = { added: Number(match[1].replaceAll(',', '')), deleted: Number(match[2].replaceAll(',', '')) };
+        break;
+      }
+    }
+    if (counts?.added > 0) return 'other';
+    if (counts?.added === 0 && counts.deleted > 0) return 'delete-only';
+    if (header.matches('[data-file-deleted="true"]') || header.querySelector('[data-file-deleted="true"]')) return 'delete-only';
+
+    // Exact, dedicated status messages survive missing line counts. Source and
+    // review comments must never be mistaken for GitHub's own status text.
+    for (const status of diff.querySelectorAll('[data-diff-anchor], .diff-empty')) {
+      if (status.closest('pre, code, table, .comment-body, [class*="Comment"]')) continue;
+      const text = status.textContent.trim();
+      if (text === 'File renamed without changes.') return 'move-only';
+      if (text === 'This file was deleted.') return 'delete-only';
+    }
+    // Collapsed renames may only retain their header and zero-change summary.
+    // Additional code fields describe binary size or mode changes: skip them.
+    const renamed = Array.from(header.querySelectorAll('h3 code .sr-only, a[href^="#diff-"] .sr-only'))
+      .some(element => element.textContent.includes(' renamed to '));
+    const otherCode = Array.from(header.querySelectorAll('code')).some(element => !element.closest('h3, a[href^="#diff-"]'));
+    if (renamed && counts?.added === 0 && counts.deleted === 0 && !otherCode) return 'move-only';
+    return counts ? 'other' : '';
+  }
+
   function getTargetFiles(button) {
     const filter = button.filter;
-    return getFiles().filter(file => !filter.active || (filePath(file) && filter.matches(filePath(file))));
+    return getFiles().filter(file => (!filter.pathActive || (filePath(file) && filter.matches(filePath(file))))
+      && (!filter.changeActive || filter.matchesChange(fileChangeType(file))));
   }
 
   function getFiles() {
@@ -186,9 +225,9 @@
       : `Mark ${button.name} (${files.length})`;
     const labelText = control.nextElementSibling;
     if (labelText && labelText.textContent !== text) labelText.textContent = text;
-    const unknownPaths = filter.active ? getFiles().filter(file => !filePath(file)).length : 0;
+    const unknownPaths = filter.pathActive ? getFiles().filter(file => !filePath(file)).length : 0;
     const title = settingsError || (!settingsReady ? 'Loading file patterns…' : filter.active && files.length === 0
-      ? `No matching loaded files.${unknownPaths ? ` Could not read paths for ${unknownPaths} loaded file${unknownPaths === 1 ? '' : 's'}.` : ' Check your patterns or load more files.'}`
+      ? `No matching loaded files.${unknownPaths ? ` Could not read paths for ${unknownPaths} loaded file${unknownPaths === 1 ? '' : 's'}.` : ' Check your filters or load more files.'}${filter.changeActive ? ' Files with unknown change types stay untouched.' : ''}`
       : filter.active
       ? 'Cycle matching loaded files between viewed, unviewed, and their original selection. Other files stay untouched.'
       : partial
