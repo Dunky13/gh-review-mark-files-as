@@ -63,6 +63,8 @@ The 1.1.2 compatibility update supplies its own button styling and a floating fa
 
 ## Version history
 
+- 1.3.1 — 2026-10-23: Maintenance release built and tested with the updated Node tooling. Extension behavior and permissions are unchanged. Prepared for Chrome Web Store submission; publication status must be verified separately.
+
 - 1.3.0 — 2026-10-23: Add per-button delete-only, move-only, and combined change filters. Existing buttons retain All changes. Prepared for release and Chrome Web Store submission; publication status must be verified separately.
 
 - 1.2.1 — 2026-10-22: Clear docking confirmations after five seconds and remember custom docking across pull requests. Preserve instructions and save errors. Verified in Chrome with the unpacked extension; publication status must be verified separately.
