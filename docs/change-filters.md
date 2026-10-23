@@ -2,6 +2,8 @@
 
 Release 1.3.0, prepared on 2026-10-23. Commit, push, PR, release, and publication are authorized. Hosted CI, merge, and store status must be verified separately.
 
+Release PR: https://github.com/Dunky13/gh-review-mark-files-as/pull/11
+
 ## Configure a button
 
 1. Open Settings and select Add button.
