@@ -1,6 +1,6 @@
 # Chrome Web Store listing
 
-Last updated: 2026-10-22
+Last updated: 2026-10-23
 
 ## Store listing
 
@@ -13,6 +13,8 @@ Detailed description:
 Mark GitHub pull request files as viewed or unviewed in a click.
 
 Create named review buttons for tests, documentation, or any file patterns. Each button has its own include and exclude patterns. Other files keep their viewed state. Buttons stay in sync when their patterns overlap.
+
+Filter each button by file changes: delete-only, move-only, or both. Delete-only includes removed files and lines with no additions. Move-only includes renames and moves without content changes. Combine change filters with path patterns or leave patterns blank to include every matching loaded file. Unknown change types stay untouched.
 
 Open Settings from the extension icon or the pull request toolbar. Add patterns with individual fields and +/− controls, then select Save. Settings stay in this browser and apply across repositories.
 
@@ -32,12 +34,12 @@ Language: English
 
 ## Permissions justification
 
-- `storage`: Save review button names, include/exclude patterns, and toolbar placement locally so users do not need to reconfigure them on each pull request.
+- `storage`: Save review button names, include/exclude patterns, file change filters, and toolbar placement locally so users do not need to reconfigure them on each pull request.
 - `https://github.com/**`: Read loaded file paths and Viewed controls on GitHub pull requests and operate those controls when the user selects a review button. Content scripts start on GitHub pages so they can follow in-place navigation from the dashboard, notifications, and repositories. Review tools and file-state processing are limited to pull request `/files` and `/changes` routes.
 
 ## Privacy and data use
 
-Saved data consists of button IDs, names, include/exclude patterns, and toolbar placement preferences in this browser. Pull request file paths and current viewed states are read transiently to select matching controls. The extension does not upload these settings or send telemetry, analytics, credentials, or repository contents to the developer or third parties. Viewed-state changes use GitHub's own controls and are handled by GitHub.
+Saved data consists of button IDs, names, include/exclude patterns, file change filters, and toolbar placement preferences in this browser. Pull request file paths, change summaries, and current viewed states are read transiently to select matching controls. The extension does not upload these settings or send telemetry, analytics, credentials, or repository contents to the developer or third parties. Viewed-state changes use GitHub's own controls and are handled by GitHub.
 
 Data is not sold, used for unrelated purposes, or used for creditworthiness or lending. The extension has no remote executable code or external analytics dependency.
 
@@ -60,6 +62,8 @@ Icons remain unchanged (`images/icon.128.png` is the store icon). Existing publi
 The 1.1.2 compatibility update supplies its own button styling and a floating fallback panel. Refresh toolbar screenshots and include the fallback panel before updating the listing assets.
 
 ## Version history
+
+- 1.3.0 — 2026-10-23: Add per-button delete-only, move-only, and combined change filters. Existing buttons retain All changes. Prepared for release and Chrome Web Store submission; publication status must be verified separately.
 
 - 1.2.1 — 2026-10-22: Clear docking confirmations after five seconds and remember custom docking across pull requests. Preserve instructions and save errors. Verified in Chrome with the unpacked extension; publication status must be verified separately.
 

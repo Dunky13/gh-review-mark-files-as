@@ -1,5 +1,11 @@
 (() => {
   const defaults = { buttons: [{ id: 'all', name: 'All Files', include: '', exclude: '' }] };
+  const changeTypes = [
+    ['all', 'All changes'],
+    ['delete-only', 'Delete-only'],
+    ['move-only', 'Move-only'],
+    ['delete-or-move', 'Delete-only and move-only'],
+  ];
   function normalize(value) {
     if (value === undefined) return { buttons: defaults.buttons.map(button => ({ ...button })) };
     if (!value || !Array.isArray(value.buttons) || value.buttons.length > 20) {
@@ -13,7 +19,11 @@
         throw new Error('Button settings are invalid. Each button needs a unique ID, name, and file patterns.');
       }
       ids.add(button.id);
-      return { id: button.id, name: button.name.trim(), include: button.include, exclude: button.exclude };
+      const changeType = button.changeType === undefined ? 'all' : button.changeType;
+      if (!changeTypes.some(([value]) => value === changeType)) {
+        throw new Error('Button settings are invalid. Choose a supported file change filter.');
+      }
+      return { id: button.id, name: button.name.trim(), include: button.include, exclude: button.exclude, changeType };
     }) };
   }
   function patterns(text) {
@@ -51,11 +61,17 @@
     const settings = value || defaults.buttons[0];
     const include = patterns(settings.include);
     const exclude = patterns(settings.exclude);
+    const changeType = settings.changeType || 'all';
+    const pathActive = include.length > 0 || exclude.length > 0;
     return {
-      active: include.length > 0 || exclude.length > 0,
+      active: pathActive || changeType !== 'all',
+      pathActive,
+      changeActive: changeType !== 'all',
+      matchesChange: type => changeType === 'all' || type === changeType
+        || (changeType === 'delete-or-move' && (type === 'delete-only' || type === 'move-only')),
       matches: path => (include.length === 0 || include.some(pattern => matchesPattern(pattern, path)))
         && !exclude.some(pattern => matchesPattern(pattern, path)),
     };
   }
-  globalThis.reviewFileSettings = { defaults, normalize, compile };
+  globalThis.reviewFileSettings = { defaults, normalize, compile, changeTypes };
 })();

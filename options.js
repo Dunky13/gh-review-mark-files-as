@@ -102,6 +102,27 @@
     header.className = 'button-header';
     header.append(label, name);
     card.append(header);
+    const changeGroup = document.createElement('div');
+    changeGroup.className = 'change-filter';
+    const changeLabel = document.createElement('label');
+    changeLabel.htmlFor = `change-${button.id}`;
+    changeLabel.textContent = 'File changes';
+    const changeType = document.createElement('select');
+    changeType.id = changeLabel.htmlFor;
+    changeType.name = 'changeType';
+    for (const [value, text] of reviewFileSettings.changeTypes) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = text;
+      changeType.append(option);
+    }
+    changeType.value = button.changeType || 'all';
+    const changeHelp = document.createElement('p');
+    changeHelp.id = `change-${button.id}-help`;
+    changeHelp.textContent = 'Delete-only: removed files or lines, with no additions. Move-only: renamed or moved with no content changes. Patterns below also apply.';
+    changeType.setAttribute('aria-describedby', changeHelp.id);
+    changeGroup.append(changeLabel, changeType, changeHelp);
+    card.append(changeGroup);
     const columns = document.createElement('div');
     columns.className = 'pattern-columns';
     card.append(columns);
@@ -148,6 +169,7 @@
       name: card.querySelector('[name=name]').value,
       include: readPatterns(card, 'include'),
       exclude: readPatterns(card, 'exclude'),
+      changeType: card.querySelector('[name=changeType]').value,
     }));
     void save({ buttons });
   });

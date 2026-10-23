@@ -140,3 +140,39 @@ test('repeated wildcards avoid exponential backtracking and retain folder bounda
   assert.equal(nested.matches('pkg/src/a/b.js'), false);
   assert.equal(nested.matches('othersrc/a1.js'), false);
 });
+
+test('change filters migrate existing buttons and reject unsupported stored values', () => {
+  const { normalize, defaults } = context.reviewFileSettings;
+  assert.equal(normalize({ buttons: defaults.buttons }).buttons[0].changeType, 'all');
+  for (const changeType of ['delete-only', 'move-only', 'delete-or-move']) {
+    assert.equal(normalize({ buttons: [{ ...defaults.buttons[0], changeType }] }).buttons[0].changeType, changeType);
+  }
+  for (const changeType of ['', null, [], 'renamed']) {
+    assert.throws(() => normalize({ buttons: [{ ...defaults.buttons[0], changeType }] }), /supported file change filter/);
+  }
+  const filter = compile({ include: 'src/**', exclude: '**/fixtures/**', changeType: 'delete-or-move' });
+  assert.equal(filter.matches('src/a.js'), true);
+  assert.equal(filter.matches('src/fixtures/a.js'), false);
+  for (const type of ['delete-only', 'move-only']) assert.equal(filter.matchesChange(type), true);
+  for (const type of ['other', '', undefined]) assert.equal(filter.matchesChange(type), false);
+});
+
+test('options save and reload independent change filters and reset to all changes', async t => {
+  const page = await options(t);
+  assert.equal(page.document.querySelector('[name=changeType]').value, 'all');
+  page.document.querySelector('#add').click();
+  const card = page.document.querySelector('.button-settings:last-child');
+  card.querySelector('[name=name]').value = 'Deletes and moves';
+  card.querySelector('[name=changeType]').value = 'delete-or-move';
+  card.querySelector('[name=exclude]').value = 'vendor/**';
+  page.document.querySelector('form').dispatchEvent(new page.window.Event('submit', { cancelable: true }));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(page.writes[0].buttons[0].changeType, 'all');
+  assert.equal(page.writes[0].buttons[1].changeType, 'delete-or-move');
+  const reloaded = await options(t, { stored: page.writes[0] });
+  assert.equal(reloaded.document.querySelector('.button-settings:last-child [name=changeType]').value, 'delete-or-move');
+  assert.equal(reloaded.document.querySelector('.button-settings:last-child [name=exclude]').value, 'vendor/**');
+  reloaded.document.querySelector('#reset').click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(reloaded.document.querySelector('[name=changeType]').value, 'all');
+});
